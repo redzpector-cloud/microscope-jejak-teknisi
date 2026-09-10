@@ -1,57 +1,307 @@
 package com.jejakteknisi.magnifier;
 
 import android.Manifest;
-import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.view.*;
-import android.widget.*;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.SeekBar;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
-import androidx.camera.core.*;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.camera.core.Camera;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.FocusMeteringAction;
+import androidx.camera.core.ImageCapture;
+import androidx.camera.core.ImageCaptureException;
+import androidx.camera.core.MeteringPoint;
+import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-public class MainActivity extends androidx.appcompat.app.AppCompatActivity {
- PreviewView preview; ImageCapture capture; Camera camera; SeekBar zoomBar;
- TextView zoomText,modeText,status; Button torchBtn; boolean torch=false,microscope=false;
- int dp(int x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}
- Button b(String s){Button x=new Button(this);x.setText(s);x.setTextColor(Color.WHITE);x.setTextSize(13);x.setAllCaps(false);x.setBackgroundColor(Color.rgb(35,40,44));return x;}
+public class MainActivity extends AppCompatActivity {
+    PreviewView preview;
+    ImageCapture capture;
+    Camera camera;
+    SeekBar zoomBar;
+    TextView zoomText, modeText, status;
+    Button torchBtn, photoBtn;
+    boolean torch = false, microscope = false;
 
- @Override public void onCreate(Bundle x){super.onCreate(x);ui(); if(ContextCompat.checkSelfPermission(this,Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.CAMERA},7);else start();}
+    int dp(int x) {
+        return (int) (x * getResources().getDisplayMetrics().density + .5f);
+    }
 
- void ui(){
-  LinearLayout r=new LinearLayout(this);r.setOrientation(LinearLayout.VERTICAL);r.setBackgroundColor(Color.BLACK);
-  LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);top.setPadding(dp(8),dp(3),dp(8),dp(3));top.setBackgroundColor(Color.rgb(18,20,22));
-  modeText=new TextView(this);modeText.setText("🔍 KACA PEMBESAR");modeText.setTextColor(Color.WHITE);modeText.setTextSize(18);top.addView(modeText,new LinearLayout.LayoutParams(0,dp(50),1));
-  Button mode=b("MODE");top.addView(mode,new LinearLayout.LayoutParams(dp(80),dp(48)));r.addView(top);
+    Button button(String text) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextColor(Color.WHITE);
+        b.setTextSize(13);
+        b.setAllCaps(false);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(2), 0, dp(2), 0);
+        b.setBackgroundColor(Color.rgb(35, 40, 44));
+        return b;
+    }
 
-  FrameLayout f=new FrameLayout(this);preview=new PreviewView(this);preview.setScaleType(PreviewView.ScaleType.FILL_CENTER);f.addView(preview,new FrameLayout.LayoutParams(-1,-1));
-  status=new TextView(this);status.setText("Menyiapkan kamera...");status.setTextColor(Color.WHITE);status.setTextSize(12);status.setPadding(dp(8),dp(5),dp(8),dp(5));
-  FrameLayout.LayoutParams q=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.START);q.setMargins(dp(8),dp(8),0,0);f.addView(status,q);r.addView(f,new LinearLayout.LayoutParams(-1,0,1));
+    @Override
+    public void onCreate(Bundle state) {
+        super.onCreate(state);
+        buildUi();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.CAMERA}, 7);
+        } else {
+            startCamera();
+        }
+    }
 
-  zoomText=new TextView(this);zoomText.setText("Zoom 1.0×");zoomText.setTextColor(Color.WHITE);zoomText.setGravity(Gravity.CENTER);zoomText.setTextSize(15);r.addView(zoomText,new LinearLayout.LayoutParams(-1,dp(30)));
-  zoomBar=new SeekBar(this);zoomBar.setMax(100);r.addView(zoomBar,new LinearLayout.LayoutParams(-1,dp(42)));
+    void buildUi() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.BLACK);
 
-  LinearLayout c=new LinearLayout(this);c.setGravity(Gravity.CENTER);
-  Button minus=b("−");torchBtn=b("🔦 Lampu");Button photo=b("📸 FOTO");Button focus=b("🎯 Fokus");Button plus=b("+");
-  c.addView(minus,new LinearLayout.LayoutParams(dp(55),dp(55)));c.addView(torchBtn,new LinearLayout.LayoutParams(dp(85),dp(55)));c.addView(photo,new LinearLayout.LayoutParams(dp(105),dp(55)));c.addView(focus,new LinearLayout.LayoutParams(dp(85),dp(55)));c.addView(plus,new LinearLayout.LayoutParams(dp(55),dp(55)));r.addView(c);setContentView(r);
+        LinearLayout top = new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(dp(8), dp(3), dp(8), dp(3));
+        top.setBackgroundColor(Color.rgb(18, 20, 22));
 
-  mode.setOnClickListener(v->{microscope=!microscope;modeText.setText(microscope?"🔬 MICROSCOPE":"🔍 KACA PEMBESAR");});
-  zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int p,boolean f){zoom(p);}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}});
-  minus.setOnClickListener(v->step(-.5f));plus.setOnClickListener(v->step(.5f));torchBtn.setOnClickListener(v->torch());focus.setOnClickListener(v->focusAt(preview.getWidth()/2f,preview.getHeight()/2f));photo.setOnClickListener(v->photo());
-  preview.setOnTouchListener((v,e)->{if(e.getAction()==MotionEvent.ACTION_UP)focusAt(e.getX(),e.getY());return true;});
- }
- void start(){ProcessCameraProvider.getInstance(this).addListener(()->{try{ProcessCameraProvider p=ProcessCameraProvider.getInstance(this).get();Preview pr=new Preview.Builder().setTargetRotation(preview.getDisplay().getRotation()).build();capture=new ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY).setTargetRotation(preview.getDisplay().getRotation()).build();p.unbindAll();camera=p.bindToLifecycle(this,CameraSelector.DEFAULT_BACK_CAMERA,pr,capture);pr.setSurfaceProvider(preview.getSurfaceProvider());update();status.setText("Kamera siap • tap untuk fokus");}catch(Exception e){status.setText("Kamera gagal");}},ContextCompat.getMainExecutor(this));}
- void update(){if(camera==null)return;float min=camera.getCameraInfo().getZoomState().getValue().getMinZoomRatio(),max=camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio(),z=camera.getCameraInfo().getZoomState().getValue().getZoomRatio();zoomText.setText(String.format("Zoom %.1f×  (maks %.1f×)",z,max));}
- void zoom(int p){if(camera==null)return;float min=1,max=camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();camera.getCameraControl().setZoomRatio(min+(max-min)*p/100f);update();}
- void step(float d){if(camera==null)return;float z=camera.getCameraInfo().getZoomState().getValue().getZoomRatio(),max=camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();z=Math.max(1,Math.min(max,z+d));camera.getCameraControl().setZoomRatio(z);zoomBar.setProgress((int)((z-1)/(max-1)*100));}
- void torch(){if(camera==null||!camera.getCameraInfo().hasFlashUnit()){status.setText("Flash tidak tersedia");return;}torch=!torch;camera.getCameraControl().enableTorch(torch);torchBtn.setText(torch?"🔦 Lampu ON":"🔦 Lampu");}
- void focusAt(float x,float y){if(camera==null)return;MeteringPoint pt=preview.getMeteringPointFactory().createPoint(x,y);camera.getCameraControl().startFocusAndMetering(new FocusMeteringAction.Builder(pt,FocusMeteringAction.FLAG_AF).build());status.setText("Fokus...");}
- void photo(){if(capture==null)return;ContentValues v=new ContentValues();v.put(MediaStore.Images.Media.DISPLAY_NAME,"Magnifier_"+System.currentTimeMillis()+".jpg");v.put(MediaStore.Images.Media.MIME_TYPE,"image/jpeg");v.put(MediaStore.Images.Media.RELATIVE_PATH,"Pictures/MagnifierMicroscope");ImageCapture.OutputFileOptions o=new ImageCapture.OutputFileOptions.Builder(getContentResolver(),MediaStore.Images.Media.EXTERNAL_CONTENT_URI,v).build();capture.takePicture(o,ContextCompat.getMainExecutor(this),new ImageCapture.OnImageSavedCallback(){public void onImageSaved(@NonNull ImageCapture.OutputFileResults r){status.setText("Foto tersimpan");}public void onError(@NonNull ImageCaptureException e){status.setText("Foto gagal");}});}
- @Override public void onRequestPermissionsResult(int r,@NonNull String[] p,@NonNull int[] g){super.onRequestPermissionsResult(r,p,g);if(r==7&&g.length>0&&g[0]==PackageManager.PERMISSION_GRANTED)start();}
+        modeText = new TextView(this);
+        modeText.setText("🔬 MICROSCOPE");
+        modeText.setTextColor(Color.WHITE);
+        modeText.setTextSize(18);
+        modeText.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(modeText, new LinearLayout.LayoutParams(0, dp(50), 1));
+
+        Button mode = button("MODE");
+        top.addView(mode, new LinearLayout.LayoutParams(dp(90), dp(50)));
+        root.addView(top);
+
+        FrameLayout cameraBox = new FrameLayout(this);
+        preview = new PreviewView(this);
+        preview.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+        cameraBox.addView(preview, new FrameLayout.LayoutParams(-1, -1));
+
+        status = new TextView(this);
+        status.setText("Menyiapkan kamera...");
+        status.setTextColor(Color.WHITE);
+        status.setTextSize(12);
+        status.setPadding(dp(8), dp(5), dp(8), dp(5));
+        FrameLayout.LayoutParams statusLp = new FrameLayout.LayoutParams(
+                -2, -2, Gravity.TOP | Gravity.START);
+        statusLp.setMargins(dp(8), dp(8), 0, 0);
+        cameraBox.addView(status, statusLp);
+        root.addView(cameraBox, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        zoomText = new TextView(this);
+        zoomText.setText("Zoom 1.0×");
+        zoomText.setTextColor(Color.WHITE);
+        zoomText.setGravity(Gravity.CENTER);
+        zoomText.setTextSize(15);
+        root.addView(zoomText, new LinearLayout.LayoutParams(-1, dp(30)));
+
+        zoomBar = new SeekBar(this);
+        zoomBar.setMax(100);
+        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        // Kontrol bawah dibuat lebih jelas: FOTO paling menonjol di tengah.
+        LinearLayout controls = new LinearLayout(this);
+        controls.setGravity(Gravity.CENTER);
+        controls.setPadding(dp(4), dp(4), dp(4), dp(6));
+        controls.setBackgroundColor(Color.rgb(10, 12, 14));
+
+        Button minus = button("−");
+        torchBtn = button("🔦\nLampu");
+        photoBtn = button("📸\nFOTO");
+        Button focus = button("🎯\nFokus");
+        Button plus = button("+");
+
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), 0.75f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.55f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), 0.75f));
+        root.addView(controls);
+
+        setContentView(root);
+
+        mode.setOnClickListener(v -> {
+            microscope = !microscope;
+            modeText.setText(microscope ? "🔬 MICROSCOPE" : "🔍 KACA PEMBESAR");
+        });
+
+        zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            public void onProgressChanged(SeekBar s, int p, boolean fromUser) { zoom(p); }
+            public void onStartTrackingTouch(SeekBar s) {}
+            public void onStopTrackingTouch(SeekBar s) {}
+        });
+
+        minus.setOnClickListener(v -> step(-.5f));
+        plus.setOnClickListener(v -> step(.5f));
+        torchBtn.setOnClickListener(v -> toggleTorch());
+        focus.setOnClickListener(v -> focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f));
+        photoBtn.setOnClickListener(v -> takePhoto());
+
+        preview.setOnTouchListener((v, e) -> {
+            if (e.getAction() == MotionEvent.ACTION_UP) {
+                focusAt(e.getX(), e.getY());
+            }
+            return true;
+        });
+    }
+
+    void startCamera() {
+        ProcessCameraProvider.getInstance(this).addListener(() -> {
+            try {
+                ProcessCameraProvider provider = ProcessCameraProvider.getInstance(this).get();
+                Preview previewUseCase = new Preview.Builder()
+                        .setTargetRotation(preview.getDisplay().getRotation())
+                        .build();
+                capture = new ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setTargetRotation(preview.getDisplay().getRotation())
+                        .build();
+
+                provider.unbindAll();
+                camera = provider.bindToLifecycle(this,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        previewUseCase, capture);
+                previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
+                updateZoomText();
+                status.setText("Kamera siap • tap untuk fokus");
+            } catch (Exception e) {
+                status.setText("Kamera gagal");
+            }
+        }, ContextCompat.getMainExecutor(this));
+    }
+
+    void updateZoomText() {
+        if (camera == null) return;
+        float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
+        float z = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
+        zoomText.setText(String.format("Zoom %.1f×  (maks %.1f×)", z, max));
+    }
+
+    void zoom(int progress) {
+        if (camera == null) return;
+        float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
+        camera.getCameraControl().setZoomRatio(1f + (max - 1f) * progress / 100f);
+        updateZoomText();
+    }
+
+    void step(float delta) {
+        if (camera == null) return;
+        float z = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
+        float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
+        z = Math.max(1f, Math.min(max, z + delta));
+        camera.getCameraControl().setZoomRatio(z);
+        zoomBar.setProgress(max <= 1f ? 0 : (int) ((z - 1f) / (max - 1f) * 100f));
+        updateZoomText();
+    }
+
+    void toggleTorch() {
+        if (camera == null || !camera.getCameraInfo().hasFlashUnit()) {
+            status.setText("Flash tidak tersedia");
+            return;
+        }
+        torch = !torch;
+        camera.getCameraControl().enableTorch(torch);
+        torchBtn.setText(torch ? "🔦\nLampu ON" : "🔦\nLampu");
+    }
+
+    void focusAt(float x, float y) {
+        if (camera == null) return;
+        MeteringPoint point = preview.getMeteringPointFactory().createPoint(x, y);
+        camera.getCameraControl().startFocusAndMetering(
+                new FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF).build());
+        status.setText("Fokus...");
+    }
+
+    void takePhoto() {
+        if (capture == null) return;
+
+        photoBtn.setEnabled(false);
+        photoBtn.setText("📸\nMEMOTRET...");
+
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.DISPLAY_NAME,
+                "Magnifier_" + System.currentTimeMillis() + ".jpg");
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+        values.put(MediaStore.Images.Media.RELATIVE_PATH,
+                "Pictures/MagnifierMicroscope");
+
+        ImageCapture.OutputFileOptions output =
+                new ImageCapture.OutputFileOptions.Builder(
+                        getContentResolver(),
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        values).build();
+
+        capture.takePicture(output, ContextCompat.getMainExecutor(this),
+                new ImageCapture.OnImageSavedCallback() {
+                    @Override
+                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults result) {
+                        photoBtn.setEnabled(true);
+                        photoBtn.setText("📸\nFOTO");
+                        status.setText("Foto tersimpan");
+                        showPhotoOptions(result.getSavedUri());
+                    }
+
+                    @Override
+                    public void onError(@NonNull ImageCaptureException error) {
+                        photoBtn.setEnabled(true);
+                        photoBtn.setText("📸\nFOTO");
+                        status.setText("Foto gagal");
+                    }
+                });
+    }
+
+    void showPhotoOptions(Uri uri) {
+        if (uri == null) return;
+
+        new AlertDialog.Builder(this)
+                .setTitle("Foto berhasil disimpan")
+                .setMessage("Foto tersimpan di Pictures/MagnifierMicroscope")
+                .setPositiveButton("🔎 Google Lens", (dialog, which) -> sendToGoogleLens(uri))
+                .setNegativeButton("Tutup", null)
+                .show();
+    }
+
+    void sendToGoogleLens(Uri uri) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("image/jpeg");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setPackage("com.google.android.googlequicksearchbox");
+
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            intent.setPackage(null);
+            startActivity(Intent.createChooser(intent, "Buka foto dengan"));
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 7 && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startCamera();
+        }
+    }
 }
