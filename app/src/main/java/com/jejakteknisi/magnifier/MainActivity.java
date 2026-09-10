@@ -16,7 +16,7 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-public class MainActivity extends Activity {
+public class MainActivity extends androidx.appcompat.app.AppCompatActivity {
  PreviewView preview; ImageCapture capture; Camera camera; SeekBar zoomBar;
  TextView zoomText,modeText,status; Button torchBtn; boolean torch=false,microscope=false;
  int dp(int x){return (int)(x*getResources().getDisplayMetrics().density+.5f);}
