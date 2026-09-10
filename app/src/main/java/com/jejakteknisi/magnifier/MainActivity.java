@@ -13,6 +13,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -91,13 +92,18 @@ public class MainActivity extends AppCompatActivity {
         top.setPadding(dp(8), dp(3), dp(8), dp(3));
         top.setBackgroundColor(Color.rgb(18, 20, 22));
 
-        TextView title = new TextView(this);
-        title.setText("🔬 MICROSCOPE");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(18);
-        title.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView logoView = new ImageView(this);
+        logoView.setImageResource(com.jejakteknisi.magnifier.R.drawable.jejak_teknisi_logo);
+        logoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        logoView.setContentDescription("Jejak Teknisi");
 
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(50), 1));
+        top.addView(
+                logoView,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        dp(66)
+                )
+        );
         root.addView(top);
 
         FrameLayout cameraBox = new FrameLayout(this);
@@ -142,7 +148,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(dp(4), dp(4), dp(4), dp(6));
+        controls.setPadding(dp(4), 0, dp(4), dp(2));
         controls.setBackgroundColor(Color.rgb(10, 12, 14));
 
         Button minus = makeButton("−");
@@ -151,11 +157,11 @@ public class MainActivity extends AppCompatActivity {
         Button focus = makeButton("🎯\nFokus");
         Button plus = makeButton("+");
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .75f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.55f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .75f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(58), .75f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(58), 1.15f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(64), 1.55f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(58), 1.15f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(58), .75f));
 
         root.addView(controls);
         setContentView(root);
