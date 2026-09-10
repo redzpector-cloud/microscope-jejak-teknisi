@@ -5,8 +5,10 @@
 
     <application
         android:allowBackup="false"
-        android:label="Magnifier Microscope"
+        android:label="Jejak Teknisi"
         android:supportsRtl="true"
+        android:icon="@drawable/jejak_teknisi_logo"
+        android:roundIcon="@drawable/jejak_teknisi_logo"
         android:theme="@style/Theme.Magnifier">
 
         <activity

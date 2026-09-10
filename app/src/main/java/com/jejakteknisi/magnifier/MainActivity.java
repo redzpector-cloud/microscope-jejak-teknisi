@@ -93,17 +93,35 @@ public class MainActivity extends AppCompatActivity {
         top.setBackgroundColor(Color.rgb(18, 20, 22));
 
         ImageView logoView = new ImageView(this);
-        logoView.setImageResource(com.jejakteknisi.magnifier.R.drawable.jejak_teknisi_logo);
-        logoView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        logoView.setContentDescription("Jejak Teknisi");
+        logoView.setImageResource(R.drawable.jejak_teknisi_logo);
+        logoView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        logoView.setContentDescription("Logo Jejak Teknisi");
 
         top.addView(
                 logoView,
                 new LinearLayout.LayoutParams(
-                        -1,
-                        dp(66)
+                        dp(52),
+                        dp(52)
                 )
         );
+
+        TextView title = new TextView(this);
+        title.setText("JEJAK TEKNISI");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(dp(10), 0, 0, 0);
+
+        top.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(58),
+                        1
+                )
+        );
+
         root.addView(top);
 
         FrameLayout cameraBox = new FrameLayout(this);
@@ -148,7 +166,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(dp(4), 0, dp(4), dp(2));
+        controls.setPadding(dp(4), dp(4), dp(4), dp(6));
         controls.setBackgroundColor(Color.rgb(10, 12, 14));
 
         Button minus = makeButton("−");
@@ -157,13 +175,19 @@ public class MainActivity extends AppCompatActivity {
         Button focus = makeButton("🎯\nFokus");
         Button plus = makeButton("+");
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(58), .75f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(58), 1.15f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(64), 1.55f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(58), 1.15f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(58), .75f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .75f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.55f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .75f));
 
-        root.addView(controls);
+        LinearLayout.LayoutParams controlParams =
+                new LinearLayout.LayoutParams(
+                        -1,
+                        -2
+                );
+        controlParams.setMargins(0, 0, 0, dp(28));
+        root.addView(controls, controlParams);
         setContentView(root);
 
         zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
