@@ -18,6 +18,7 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import com.google.common.util.concurrent.ListenableFuture;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
@@ -189,7 +190,8 @@ public class MainActivity extends AppCompatActivity {
     private void startCamera() {
         status.setText("Menyiapkan kamera...");
 
-        final var future = ProcessCameraProvider.getInstance(this);
+        final ListenableFuture<ProcessCameraProvider> future =
+                ProcessCameraProvider.getInstance(this);
 
         future.addListener(() -> {
             try {
