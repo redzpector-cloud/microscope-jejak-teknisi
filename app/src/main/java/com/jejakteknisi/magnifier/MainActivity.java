@@ -27,6 +27,9 @@ import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
 import androidx.camera.core.MeteringPoint;
 import androidx.camera.core.Preview;
+import androidx.camera.core.ResolutionSelector;
+import androidx.camera.core.resolutionselector.ResolutionStrategy;
+import androidx.camera.camera2.interop.Camera2Interop;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
@@ -180,13 +183,51 @@ public class MainActivity extends AppCompatActivity {
         ProcessCameraProvider.getInstance(this).addListener(() -> {
             try {
                 ProcessCameraProvider provider = ProcessCameraProvider.getInstance(this).get();
-                Preview previewUseCase = new Preview.Builder()
-                        .setTargetRotation(preview.getDisplay().getRotation())
+                // Prioritaskan resolusi kamera tertinggi yang tersedia. Ini membuat
+                // mode microscope memakai sebanyak mungkin detail sensor, bukan
+                // sekadar memperbesar gambar secara digital.
+                ResolutionSelector highest = new ResolutionSelector.Builder()
+                        .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
                         .build();
-                capture = new ImageCapture.Builder()
+
+                Preview.Builder previewBuilder = new Preview.Builder()
+                        .setResolutionSelector(highest)
+                        .setTargetRotation(preview.getDisplay().getRotation());
+
+                // Minta pipeline Camera2 memakai autofocus kontinu dan pemrosesan
+                // kualitas tinggi bila perangkat mendukungnya. Opsi yang tidak
+                // didukung akan diabaikan oleh kamera sehingga tetap kompatibel.
+                Camera2Interop.Extender<Preview> previewInterop =
+                        new Camera2Interop.Extender<>(previewBuilder);
+                previewInterop.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE,
+                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                previewInterop.setCaptureRequestOption(CaptureRequest.EDGE_MODE,
+                        CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+                previewInterop.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE,
+                        CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
+                previewInterop.setCaptureRequestOption(CaptureRequest.SHADING_MODE,
+                        CaptureRequest.SHADING_MODE_HIGH_QUALITY);
+
+                Preview previewUseCase = previewBuilder.build();
+
+                ImageCapture.Builder captureBuilder = new ImageCapture.Builder()
+                        .setResolutionSelector(highest)
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                        .setTargetRotation(preview.getDisplay().getRotation())
-                        .build();
+                        .setJpegQuality(100)
+                        .setTargetRotation(preview.getDisplay().getRotation());
+
+                Camera2Interop.Extender<ImageCapture> captureInterop =
+                        new Camera2Interop.Extender<>(captureBuilder);
+                captureInterop.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE,
+                        CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                captureInterop.setCaptureRequestOption(CaptureRequest.EDGE_MODE,
+                        CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+                captureInterop.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE,
+                        CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
+                captureInterop.setCaptureRequestOption(CaptureRequest.SHADING_MODE,
+                        CaptureRequest.SHADING_MODE_HIGH_QUALITY);
+
+                capture = captureBuilder.build();
 
                 provider.unbindAll();
                 camera = provider.bindToLifecycle(this,
