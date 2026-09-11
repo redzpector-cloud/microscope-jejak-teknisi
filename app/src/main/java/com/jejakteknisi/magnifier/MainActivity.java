@@ -265,10 +265,12 @@ public class MainActivity extends AppCompatActivity {
         infoRow.setBackgroundColor(Color.BLACK);
 
         zoomText = makeInfoText("Zoom 1.0×");
+        zoomText.setTextSize(14);
         exposureText = makeInfoText("Exposure 0 • NORMAL");
+        exposureText.setTextSize(14);
         infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(30), 1));
         infoRow.addView(exposureText, new LinearLayout.LayoutParams(0, dp(30), 1));
-        root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(30)));
+        root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(48)));
 
         zoomBar = new SeekBar(this);
         zoomBar.setMax(100);
@@ -1691,52 +1693,62 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendToGoogleLens(Uri imageUri) {
-        // Jangan gunakan ACTION_SEND karena itu membuka Android Share Sheet.
-        // Gunakan deep-link Google Lens agar foto langsung masuk ke Lens.
+        // Open Google Lens directly. Do NOT use ACTION_SEND/ACTION_CHOOSER,
+        // because those open the Android Share Sheet.
         if (imageUri == null) {
             status.setText("Foto belum siap untuk Google Lens");
             return;
         }
 
         final String googlePackage = "com.google.android.googlequicksearchbox";
-        final String[] schemes = {"googleapp", "google"};
+        final String[] lensSchemes = {"googleapp", "google"};
 
-        for (String scheme : schemes) {
-            try {
-                Uri lensUri = Uri.parse(scheme + "://lens")
-                        .buildUpon()
-                        .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
-                        .build();
-
-                grantUriPermission(
-                        googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                Intent lensIntent = new Intent(Intent.ACTION_VIEW, lensUri);
-                lensIntent.setPackage(googlePackage);
-                lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-                if (lensIntent.resolveActivity(getPackageManager()) != null) {
-                    startActivity(lensIntent);
-                    return;
-                }
-            } catch (Exception ignored) {
-                // Coba kontrak Lens berikutnya.
-            }
-        }
-
-        // Fallback untuk perangkat yang memasang Google Lens sebagai aplikasi
-        // terpisah. Jangan pernah membuka Share Sheet.
         try {
-            Intent standaloneLens = getPackageManager()
-                    .getLaunchIntentForPackage("com.google.ar.lens");
-            if (standaloneLens != null) {
-                startActivity(standaloneLens);
-                return;
-            }
+            // Give Google a temporary read permission for the cached image.
+            grantUriPermission(googlePackage, imageUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
         } catch (Exception ignored) {
         }
 
-        status.setText("Google Lens belum tersedia. Instal/perbarui aplikasi Google atau Google Lens.");
+        for (String scheme : lensSchemes) {
+            try {
+                Uri lensUri = new Uri.Builder()
+                        .scheme(scheme)
+                        .authority("lens")
+                        .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
+                        .build();
+
+                Intent lensIntent = new Intent(Intent.ACTION_VIEW, lensUri);
+                lensIntent.setPackage(googlePackage);
+                lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                // Try the explicit Google package first. Android 11+ package
+                // visibility is also declared in AndroidManifest.xml.
+                startActivity(lensIntent);
+                status.setText("Membuka Google Lens…");
+                return;
+            } catch (android.content.ActivityNotFoundException ignored) {
+                // Try the next Lens URI contract.
+            } catch (Exception ignored) {
+                // Keep the app alive if a vendor ROM rejects the deep link.
+            }
+        }
+
+        // Some devices expose Lens through the standalone package. Try its
+        // Lens activity without ever falling back to ACTION_SEND.
+        try {
+            Intent standalone = new Intent(Intent.ACTION_VIEW);
+            standalone.setData(Uri.parse("googleapp://lens"));
+            standalone.setPackage("com.google.ar.lens");
+            standalone.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(standalone);
+            status.setText("Membuka Google Lens…");
+            return;
+        } catch (Exception ignored) {
+        }
+
+        status.setText("Google Lens tidak dapat dibuka. Pastikan aplikasi Google sudah terpasang dan diperbarui.");
     }
 
     @Override

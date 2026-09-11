@@ -18,3 +18,9 @@ Workflow berada di `.github/workflows/main.yml`.
 1. Upload seluruh isi project ke repository GitHub.
 2. Push ke branch `main` atau jalankan Actions → Build Magnifier Microscope APK → Run workflow.
 3. APK Debug tersedia pada artifact `magnifier-microscope-debug-apk`.
+
+## V3 changes
+- Google Lens launch no longer uses ACTION_SEND/Share Sheet.
+- Added Android package visibility for Google/Lens on Android 11+.
+- Photo remains in app cache until the user chooses Gallery.
+- Increased the zoom/exposure info row height so labels are not clipped.
