@@ -23,6 +23,13 @@ import android.view.View;
 import android.view.ViewParent;
 import android.view.ScaleGestureDetector;
 import android.graphics.Matrix;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.RectF;
+import android.graphics.drawable.ColorDrawable;
+import android.view.inputmethod.InputMethodManager;
+import android.content.Context;
 
 import androidx.annotation.NonNull;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -79,6 +86,13 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout topBar;
     private LinearLayout controlsBar;
     private boolean torch = false;
+
+    // V2.5 PCB inspection / annotation
+    private FrameLayout cameraBox;
+    private AnnotationView annotationView;
+    private LinearLayout annotationBar;
+    private enum AnnotationMode { NONE, MARKER, ARROW, CIRCLE, TEXT }
+    private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
@@ -156,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.4");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.5");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -178,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
 
         root.addView(top);
 
-        FrameLayout cameraBox = new FrameLayout(this);
+        cameraBox = new FrameLayout(this);
 
         preview = new PreviewView(this);
         preview.setScaleType(PreviewView.ScaleType.FILL_CENTER);
@@ -367,6 +381,248 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    private void showAnnotationTools() {
+        if (annotationBar != null) return;
+
+        annotationBar = new LinearLayout(this);
+        annotationBar.setOrientation(LinearLayout.HORIZONTAL);
+        annotationBar.setGravity(Gravity.CENTER);
+        annotationBar.setPadding(dp(4), dp(4), dp(4), dp(4));
+        annotationBar.setBackgroundColor(Color.rgb(22, 24, 27));
+
+        Button marker = makeButton("●\nTitik");
+        Button arrow = makeButton("➜\nPanah");
+        Button circle = makeButton("○\nLingkar");
+        Button text = makeButton("T\nTeks");
+        Button undo = makeButton("↩\nUndo");
+        Button clear = makeButton("✕\nHapus");
+        Button save = makeButton("💾\nSimpan");
+
+        Button[] buttons = {marker, arrow, circle, text, undo, clear, save};
+        for (Button b : buttons) {
+            annotationBar.addView(b, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        }
+
+        marker.setOnClickListener(v -> {
+            annotationMode = AnnotationMode.MARKER;
+            annotationView.setMode(annotationMode);
+            status.setText("Marker aktif • tap titik komponen");
+        });
+        arrow.setOnClickListener(v -> {
+            annotationMode = AnnotationMode.ARROW;
+            annotationView.setMode(annotationMode);
+            status.setText("Panah aktif • tarik dari awal ke akhir");
+        });
+        circle.setOnClickListener(v -> {
+            annotationMode = AnnotationMode.CIRCLE;
+            annotationView.setMode(annotationMode);
+            status.setText("Lingkaran aktif • tarik mengelilingi komponen");
+        });
+        text.setOnClickListener(v -> {
+            annotationMode = AnnotationMode.TEXT;
+            annotationView.setMode(annotationMode);
+            status.setText("Teks aktif • tap lokasi untuk menulis catatan");
+        });
+        undo.setOnClickListener(v -> {
+            annotationView.undo();
+            status.setText("Undo anotasi");
+        });
+        clear.setOnClickListener(v -> {
+            annotationView.clearAll();
+            status.setText("Semua anotasi dihapus");
+        });
+        save.setOnClickListener(v -> saveAnnotatedFreeze());
+
+        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
+                -1, -2, Gravity.BOTTOM);
+        barParams.bottomMargin = dp(4);
+        cameraBox.addView(annotationBar, barParams);
+
+        annotationView = new AnnotationView(this);
+        FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
+        // Annotation view must be above the frozen image but below the tool bar.
+        cameraBox.addView(annotationView, cameraBox.indexOfChild(freezeView) + 1, overlayParams);
+        annotationView.setMode(annotationMode);
+    }
+
+    private void hideAnnotationTools() {
+        annotationMode = AnnotationMode.NONE;
+        if (annotationBar != null) {
+            cameraBox.removeView(annotationBar);
+            annotationBar = null;
+        }
+        if (annotationView != null) {
+            cameraBox.removeView(annotationView);
+            annotationView = null;
+        }
+    }
+
+    private void saveAnnotatedFreeze() {
+        if (!frozen || frozenBitmap == null || annotationView == null) {
+            status.setText("Bekukan gambar dulu");
+            return;
+        }
+
+        Bitmap base = getFrozenZoomedBitmap();
+        if (base == null) {
+            status.setText("Gagal menyiapkan gambar");
+            return;
+        }
+
+        Bitmap result = base.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(result);
+
+        float vw = Math.max(1f, annotationView.getWidth());
+        float vh = Math.max(1f, annotationView.getHeight());
+        float sx = result.getWidth() / vw;
+        float sy = result.getHeight() / vh;
+
+        annotationView.drawScaledAnnotations(canvas, sx, sy);
+        saveBitmap(result);
+        status.setText("PCB inspection tersimpan");
+    }
+
+    private void showTextInput(final float x, final float y) {
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setSingleLine(true);
+        input.setHint("Contoh: VCC / jalur putus");
+        input.setTextColor(Color.WHITE);
+        input.setHintTextColor(Color.LTGRAY);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Tambah catatan")
+                .setView(input)
+                .setPositiveButton("Tambah", (d, which) -> {
+                    String value = input.getText().toString().trim();
+                    if (!value.isEmpty() && annotationView != null) {
+                        annotationView.addText(x, y, value);
+                        status.setText("Catatan ditambahkan");
+                    }
+                })
+                .setNegativeButton("Batal", null)
+                .create();
+        dialog.setOnShowListener(d -> {
+            input.requestFocus();
+            input.postDelayed(() -> {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT);
+            }, 150);
+        });
+        dialog.show();
+    }
+
+    private class AnnotationView extends View {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final java.util.ArrayList<Annotation> items = new java.util.ArrayList<>();
+        private AnnotationMode mode = AnnotationMode.NONE;
+        private float startX, startY, endX, endY;
+        private boolean drawing = false;
+
+        AnnotationView(Context context) {
+            super(context);
+            setBackground(new ColorDrawable(Color.TRANSPARENT));
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        void setMode(AnnotationMode m) { mode = m; drawing = false; invalidate(); }
+
+        void undo() {
+            if (!items.isEmpty()) items.remove(items.size() - 1);
+            invalidate();
+        }
+
+        void clearAll() {
+            items.clear();
+            invalidate();
+        }
+
+        void addText(float x, float y, String text) {
+            items.add(Annotation.text(x, y, text));
+            invalidate();
+        }
+
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            drawAnnotations(canvas, 1f, 1f);
+            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER) {
+                drawOne(canvas, Annotation.shape(mode, startX, startY, endX, endY), 1f, 1f);
+            }
+        }
+
+        private void drawAnnotations(Canvas canvas, float sx, float sy) {
+            for (Annotation a : items) drawOne(canvas, a, sx, sy);
+        }
+
+        private void drawOne(Canvas canvas, Annotation a, float sx, float sy) {
+            paint.setColor(Color.RED);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(3) * Math.max(1f, Math.min(sx, sy)));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setTextSize(dp(18) * Math.max(1f, Math.min(sx, sy)));
+            paint.setTypeface(Typeface.DEFAULT_BOLD);
+
+            float x1=a.x1*sx, y1=a.y1*sy, x2=a.x2*sx, y2=a.y2*sy;
+            if (a.type == AnnotationMode.MARKER) {
+                paint.setStyle(Paint.Style.FILL);
+                canvas.drawCircle(x1, y1, dp(7) * Math.max(1f, Math.min(sx, sy)), paint);
+            } else if (a.type == AnnotationMode.ARROW) {
+                canvas.drawLine(x1,y1,x2,y2,paint);
+                double ang=Math.atan2(y2-y1,x2-x1);
+                float len=dp(18)*Math.max(1f,Math.min(sx,sy));
+                canvas.drawLine(x2,y2,x2-len*(float)Math.cos(ang-0.45),y2-len*(float)Math.sin(ang-0.45),paint);
+                canvas.drawLine(x2,y2,x2-len*(float)Math.cos(ang+0.45),y2-len*(float)Math.sin(ang+0.45),paint);
+            } else if (a.type == AnnotationMode.CIRCLE) {
+                canvas.drawOval(new RectF(Math.min(x1,x2),Math.min(y1,y2),Math.max(x1,x2),Math.max(y1,y2)),paint);
+            } else if (a.type == AnnotationMode.TEXT) {
+                paint.setStyle(Paint.Style.FILL);
+                paint.setShadowLayer(dp(3), 1, 1, Color.BLACK);
+                canvas.drawText(a.text, x1, y1, paint);
+                paint.clearShadowLayer();
+            }
+        }
+
+        void drawScaledAnnotations(Canvas canvas, float sx, float sy) {
+            drawAnnotations(canvas, sx, sy);
+        }
+
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            if (!frozen || mode == AnnotationMode.NONE) return false;
+            float x=e.getX(), y=e.getY();
+            if (mode == AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) {
+                showTextInput(x,y);
+                return true;
+            }
+            if (mode == AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) {
+                items.add(Annotation.marker(x,y));
+                invalidate();
+                return true;
+            }
+            switch (e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    startX=x; startY=y; endX=x; endY=y; drawing=true; return true;
+                case MotionEvent.ACTION_MOVE:
+                    endX=x; endY=y; invalidate(); return true;
+                case MotionEvent.ACTION_UP:
+                    endX=x; endY=y;
+                    if (drawing) items.add(Annotation.shape(mode,startX,startY,endX,endY));
+                    drawing=false; invalidate(); return true;
+            }
+            return true;
+        }
+    }
+
+    private static class Annotation {
+        AnnotationMode type;
+        float x1,y1,x2,y2;
+        String text;
+        static Annotation marker(float x,float y){ return shape(AnnotationMode.MARKER,x,y,x,y); }
+        static Annotation text(float x,float y,String t){ Annotation a=marker(x,y); a.type=AnnotationMode.TEXT; a.text=t; return a; }
+        static Annotation shape(AnnotationMode m,float x1,float y1,float x2,float y2){
+            Annotation a=new Annotation(); a.type=m; a.x1=x1; a.y1=y1; a.x2=x2; a.y2=y2; return a;
+        }
+    }
+
     private void applySystemBarInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -505,6 +761,7 @@ public class MainActivity extends AppCompatActivity {
             freezeBtn.setText("▶️\nLIVE");
             status.setText("❄️ BEKU • zoom + geser gambar • FOTO untuk simpan");
         } else {
+            hideAnnotationTools();
             frozenBitmap = null;
             if (freezeView != null) {
                 ViewParent parent = freezeView.getParent();
