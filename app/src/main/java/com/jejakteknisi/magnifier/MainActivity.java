@@ -14,6 +14,7 @@ import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -98,8 +99,18 @@ public class MainActivity extends AppCompatActivity {
     private Button cameraMinusBtn;
     private Button cameraFocusBtn;
     private Button cameraPlusBtn;
+    private Button overlayBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
+
+    // V3.0 Crosshair + Grid overlay
+    private OverlayView overlayView;
+    private boolean crosshairOn = false;
+    private boolean gridOn = false;
+    private int gridDivisions = 10;
+    private int overlayColor = Color.GREEN;
+    private int crosshairColor = Color.RED;
+    private int overlayAlpha = 150;
 
     // V2.5 PCB inspection / annotation
     private FrameLayout cameraBox;
@@ -185,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.9");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.0");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -228,6 +239,10 @@ public class MainActivity extends AppCompatActivity {
                 new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
         statusParams.setMargins(dp(8), dp(8), 0, 0);
         cameraBox.addView(status, statusParams);
+
+        overlayView = new OverlayView(this);
+        overlayView.setVisibility(View.VISIBLE);
+        cameraBox.addView(overlayView, new FrameLayout.LayoutParams(-1, -1));
 
         root.addView(
                 cameraBox,
@@ -290,6 +305,8 @@ public class MainActivity extends AppCompatActivity {
         photoBtn = makeButton("📸\nFOTO");
         Button focus = makeButton("🎯\nFokus");
         cameraFocusBtn = focus;
+        overlayBtn = makeButton("🎯\nGrid");
+        overlayBtn.setTextSize(11);
         Button plus = makeButton("+");
         cameraPlusBtn = plus;
 
@@ -298,6 +315,7 @@ public class MainActivity extends AppCompatActivity {
         controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
         controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.25f));
         controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
         controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .55f));
 
         LinearLayout.LayoutParams controlParams =
@@ -365,6 +383,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         photoBtn.setOnClickListener(v -> takePhoto());
+        overlayBtn.setOnClickListener(v -> showOverlaySettings());
 
         preview.setOnTouchListener((v, event) -> {
             if (frozen) {
@@ -709,6 +728,103 @@ public class MainActivity extends AppCompatActivity {
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         startActivity(Intent.createChooser(intent, "Bagikan hasil PCB"));
+    }
+
+    private class OverlayView extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        OverlayView(Context context) {
+            super(context);
+            setBackgroundColor(Color.TRANSPARENT);
+            setClickable(false);
+            setFocusable(false);
+            setWillNotDraw(false);
+        }
+        @Override protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (!crosshairOn && !gridOn) return;
+            int w=getWidth(), h=getHeight();
+            if (w<=0 || h<=0) return;
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeCap(Paint.Cap.BUTT);
+            if (gridOn) {
+                p.setColor(Color.argb(overlayAlpha, Color.red(overlayColor), Color.green(overlayColor), Color.blue(overlayColor)));
+                p.setStrokeWidth(dp(1));
+                int cols=gridDivisions, rows=Math.max(6, Math.round(cols*h/(float)w));
+                for(int i=1;i<cols;i++) { float x=w*i/(float)cols; canvas.drawLine(x,0,x,h,p); }
+                for(int j=1;j<rows;j++) { float y=h*j/(float)rows; canvas.drawLine(0,y,w,y,p); }
+            }
+            if (crosshairOn) {
+                p.setColor(Color.argb(overlayAlpha, Color.red(crosshairColor), Color.green(crosshairColor), Color.blue(crosshairColor)));
+                p.setStrokeWidth(dp(2));
+                float cx=w/2f, cy=h/2f;
+                canvas.drawLine(cx,0,cx,h,p);
+                canvas.drawLine(0,cy,w,cy,p);
+                p.setStyle(Paint.Style.STROKE);
+                canvas.drawCircle(cx,cy,dp(13),p);
+                p.setStyle(Paint.Style.FILL);
+                canvas.drawCircle(cx,cy,dp(3),p);
+            }
+        }
+        void refresh(){ invalidate(); }
+    }
+
+    private void showOverlaySettings() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8), dp(2), dp(8), dp(2));
+
+        CheckBox cross = new CheckBox(this);
+        cross.setText("Crosshair"); cross.setTextColor(Color.WHITE); cross.setTextSize(16); cross.setChecked(crosshairOn);
+        CheckBox grid = new CheckBox(this);
+        grid.setText("Grid PCB"); grid.setTextColor(Color.WHITE); grid.setTextSize(16); grid.setChecked(gridOn);
+        box.addView(cross); box.addView(grid);
+
+        TextView sizeLabel = makeInfoText("Ukuran Grid"); sizeLabel.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+        box.addView(sizeLabel, new LinearLayout.LayoutParams(-1, dp(32)));
+        LinearLayout sizeRow = new LinearLayout(this); sizeRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button small = makeButton("Kecil"); Button medium = makeButton("Sedang"); Button large = makeButton("Besar");
+        sizeRow.addView(small,new LinearLayout.LayoutParams(0,dp(42),1));
+        sizeRow.addView(medium,new LinearLayout.LayoutParams(0,dp(42),1));
+        sizeRow.addView(large,new LinearLayout.LayoutParams(0,dp(42),1));
+        box.addView(sizeRow);
+
+        TextView colorLabel = makeInfoText("Warna Grid / Crosshair"); colorLabel.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+        box.addView(colorLabel,new LinearLayout.LayoutParams(-1,dp(32)));
+        LinearLayout colorRow=new LinearLayout(this); colorRow.setOrientation(LinearLayout.HORIZONTAL);
+        Button red=makeButton("●"); Button green=makeButton("●"); Button yellow=makeButton("●"); Button blue=makeButton("●"); Button white=makeButton("●");
+        red.setTextColor(Color.RED); green.setTextColor(Color.GREEN); yellow.setTextColor(Color.YELLOW); blue.setTextColor(Color.CYAN); white.setTextColor(Color.WHITE);
+        Button[] colors={red,green,yellow,blue,white};
+        for(Button b:colors) colorRow.addView(b,new LinearLayout.LayoutParams(0,dp(40),1));
+        box.addView(colorRow);
+
+        TextView opacityLabel = makeInfoText("Transparansi Overlay  " + Math.round(overlayAlpha*100f/255f) + "%");
+        opacityLabel.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
+        box.addView(opacityLabel,new LinearLayout.LayoutParams(-1,dp(32)));
+        SeekBar opacity=new SeekBar(this); opacity.setMax(80); opacity.setProgress(Math.round(overlayAlpha*80f/255f));
+        box.addView(opacity,new LinearLayout.LayoutParams(-1,dp(44)));
+
+        cross.setOnCheckedChangeListener((b,checked)->{crosshairOn=checked; overlayView.refresh();});
+        grid.setOnCheckedChangeListener((b,checked)->{gridOn=checked; overlayView.refresh();});
+        small.setOnClickListener(v->{gridDivisions=16; overlayView.refresh(); sizeLabel.setText("Ukuran Grid: Kecil");});
+        medium.setOnClickListener(v->{gridDivisions=10; overlayView.refresh(); sizeLabel.setText("Ukuran Grid: Sedang");});
+        large.setOnClickListener(v->{gridDivisions=6; overlayView.refresh(); sizeLabel.setText("Ukuran Grid: Besar");});
+        View.OnClickListener colorClick=v->{
+            if(v==red){overlayColor=Color.RED;crosshairColor=Color.RED;}
+            else if(v==green){overlayColor=Color.GREEN;crosshairColor=Color.GREEN;}
+            else if(v==yellow){overlayColor=Color.YELLOW;crosshairColor=Color.YELLOW;}
+            else if(v==blue){overlayColor=Color.CYAN;crosshairColor=Color.CYAN;}
+            else {overlayColor=Color.WHITE;crosshairColor=Color.WHITE;}
+            overlayView.refresh();
+        };
+        for(Button b:colors) b.setOnClickListener(colorClick);
+        opacity.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+            public void onProgressChanged(SeekBar s,int value,boolean fromUser){overlayAlpha=Math.max(30,Math.round(value*255f/80f));opacityLabel.setText("Transparansi Overlay  "+Math.round(overlayAlpha*100f/255f)+"%");overlayView.refresh();}
+            public void onStartTrackingTouch(SeekBar s){} public void onStopTrackingTouch(SeekBar s){}
+        });
+
+        new AlertDialog.Builder(this).setTitle("V3.0 • Crosshair + Grid")
+                .setView(box).setPositiveButton("Selesai",(d,w)->status.setText((crosshairOn||gridOn)?"Overlay aktif • Crosshair + Grid":"Overlay OFF"))
+                .setNeutralButton("Reset",(d,w)->{crosshairOn=false;gridOn=false;gridDivisions=10;overlayColor=Color.GREEN;crosshairColor=Color.RED;overlayAlpha=150;overlayView.refresh();status.setText("Overlay di-reset");}).show();
     }
 
     private class AnnotationView extends View {
@@ -1108,6 +1224,7 @@ public class MainActivity extends AppCompatActivity {
         if (photoBtn != null) photoBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
         if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
         if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (overlayBtn != null) overlayBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
 
         if (freezeBtn != null) {
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) freezeBtn.getLayoutParams();
