@@ -20,7 +20,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.ScrollView;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.ScaleGestureDetector;
@@ -32,6 +31,8 @@ import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import android.content.ActivityNotFoundException;
+import android.os.Build;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -63,6 +64,8 @@ import androidx.core.view.WindowInsetsCompat;
 public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
+    private static final int MAX_FREEZE_DIMENSION = 4096;
+    private static final int OCR_MAX_DIMENSION = 2048;
 
     private PreviewView preview;
     private ImageCapture capture;
@@ -101,9 +104,10 @@ public class MainActivity extends AppCompatActivity {
     private Button cameraFocusBtn;
     private Button cameraPlusBtn;
     private Button overlayBtn;
-    private Button guideBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
+    private int exposureLower = -4;
+    private int exposureUpper = 4;
 
     // V3.0 Crosshair + Grid overlay
     private OverlayView overlayView;
@@ -118,8 +122,7 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout cameraBox;
     private AnnotationView annotationView;
     private LinearLayout annotationBar;
-    private TextView jumperZoomText;
-    private enum AnnotationMode { NONE, SELECT, MARKER, ARROW, CIRCLE, TEXT, OCR, JUMPER }
+    private enum AnnotationMode { NONE, SELECT, MARKER, ARROW, CIRCLE, TEXT, OCR }
     private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
@@ -193,15 +196,15 @@ public class MainActivity extends AppCompatActivity {
         top.addView(
                 logoView,
                 new LinearLayout.LayoutParams(
-                        dp(46),
-                        dp(46)
+                        dp(52),
+                        dp(52)
                 )
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.2");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.0");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(16);
+        title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
         title.setPadding(dp(10), 0, 0, 0);
@@ -210,18 +213,14 @@ public class MainActivity extends AppCompatActivity {
                 title,
                 new LinearLayout.LayoutParams(
                         0,
-                        dp(52),
+                        dp(58),
                         1
                 )
         );
 
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(13);
-        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(72), dp(52)));
-
-        guideBtn = makeButton("❓\nPanduan");
-        guideBtn.setTextSize(11);
-        top.addView(guideBtn, new LinearLayout.LayoutParams(dp(72), dp(52)));
+        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(92), dp(58)));
 
         root.addView(top);
 
@@ -278,8 +277,8 @@ public class MainActivity extends AppCompatActivity {
         exposureRow.setGravity(Gravity.CENTER_VERTICAL);
         exposureRow.setPadding(dp(8), 0, dp(8), 0);
         exposureBar = new SeekBar(this);
-        exposureBar.setMax(8);
-        exposureBar.setProgress(4);
+        exposureBar.setMax(100);
+        exposureBar.setProgress(50);
         exposureRow.addView(exposureBar, new LinearLayout.LayoutParams(0, dp(40), 1));
         autoExposureBtn = makeButton("AUTO");
         autoExposureBtn.setTextSize(12);
@@ -312,18 +311,18 @@ public class MainActivity extends AppCompatActivity {
         photoBtn = makeButton("📸\nFOTO");
         Button focus = makeButton("🎯\nFokus");
         cameraFocusBtn = focus;
-        overlayBtn = makeButton("🔧\nJumper");
+        overlayBtn = makeButton("🎯\nGrid");
         overlayBtn.setTextSize(11);
         Button plus = makeButton("+");
         cameraPlusBtn = plus;
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(54), .5f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(54), 1.0f));
-        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(54), 1.0f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(60), 1.1f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(54), 1.0f));
-        controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(54), 1.0f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(54), .5f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .55f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.25f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .55f));
 
         LinearLayout.LayoutParams controlParams =
                 new LinearLayout.LayoutParams(-1, -2);
@@ -353,7 +352,7 @@ public class MainActivity extends AppCompatActivity {
 
         exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) setExposure(progress - 4);
+                if (fromUser) setExposureFromProgress(progress);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -390,13 +389,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         photoBtn.setOnClickListener(v -> takePhoto());
-        overlayBtn.setOnClickListener(v -> {
-            if (!frozen) toggleFreeze();
-            if (frozen && annotationView != null) {
-                setAnnotationMode(AnnotationMode.JUMPER, "🔧 JUMPER PRO • tarik titik A → B di area gambar");
-            }
-        });
-        guideBtn.setOnClickListener(v -> showUserGuide());
+        overlayBtn.setOnClickListener(v -> showOverlaySettings());
 
         preview.setOnTouchListener((v, event) -> {
             if (frozen) {
@@ -438,120 +431,79 @@ public class MainActivity extends AppCompatActivity {
         annotationBar = new LinearLayout(this);
         annotationBar.setOrientation(LinearLayout.VERTICAL);
         annotationBar.setGravity(Gravity.CENTER);
-        annotationBar.setPadding(dp(6), dp(4), dp(6), dp(4));
-        annotationBar.setBackgroundColor(Color.rgb(12, 18, 23));
+        annotationBar.setPadding(dp(4), dp(3), dp(4), dp(3));
+        annotationBar.setBackgroundColor(Color.rgb(22, 24, 27));
 
-        // Compact title/instruction row: never clipped on small portrait screens.
-        LinearLayout modeHeader = new LinearLayout(this);
-        modeHeader.setOrientation(LinearLayout.HORIZONTAL);
-        modeHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView modeTitle = makeInfoText("🔧  Mode Jumper");
-        modeTitle.setTextSize(13);
-        modeTitle.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        TextView modeHint = makeInfoText("Tarik A → B • 2 jari = zoom gambar");
-        modeHint.setTextSize(10);
-        modeHint.setTypeface(Typeface.DEFAULT);
-        modeHint.setGravity(Gravity.CENTER | Gravity.CENTER_VERTICAL);
-        modeHeader.addView(modeTitle, new LinearLayout.LayoutParams(0, dp(30), 1f));
-        modeHeader.addView(modeHint, new LinearLayout.LayoutParams(0, dp(30), 1.35f));
-
-        LinearLayout toolRow = new LinearLayout(this);
-        toolRow.setOrientation(LinearLayout.HORIZONTAL);
-        toolRow.setGravity(Gravity.CENTER);
-
-        Button pan = makeButton("✋ Geser");
-        Button select = makeButton("☝ Pilih");
-        Button marker = makeButton("● Titik");
-        Button arrow = makeButton("➜ Panah");
-        Button circle = makeButton("○ Lingkar");
-        Button text = makeButton("T Teks");
-        Button jumper = makeButton("🔧 Jumper");
-        Button[] tools = {pan, select, marker, arrow, circle, text, jumper};
-        for (Button b : tools) {
-            b.setTextSize(9);
-            b.setSingleLine(true);
-            toolRow.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
-        }
-
-        LinearLayout actionRow = new LinearLayout(this);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        actionRow.setGravity(Gravity.CENTER);
-        Button ocr = makeButton("🔎 OCR");
-        Button undo = makeButton("↩ Undo");
-        Button redo = makeButton("↪ Redo");
-        Button duplicate = makeButton("⧉ Duplikat");
-        Button edit = makeButton("✎ Edit");
-        Button clear = makeButton("✕ Hapus");
-        Button save = makeButton("💾 Simpan");
-        Button share = makeButton("↗ Share");
-        Button[] actions = {ocr, undo, redo, duplicate, edit, clear, save, share};
-        for (Button b : actions) {
-            b.setTextSize(8);
-            b.setSingleLine(true);
-            actionRow.addView(b, new LinearLayout.LayoutParams(0, dp(34), 1f));
-        }
-
-        // Dedicated image zoom row for Jumper/Freeze. It works with buttons and pinch.
-        LinearLayout zoomRow = new LinearLayout(this);
-        zoomRow.setOrientation(LinearLayout.HORIZONTAL);
-        zoomRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView zoomLabel = makeInfoText("Gambar");
-        zoomLabel.setTextSize(10);
-        zoomLabel.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
-        Button zoomMinus = makeButton("−");
-        Button zoomReset = makeButton("Reset");
-        Button zoomPlus = makeButton("+");
-        jumperZoomText = makeInfoText("Zoom 1.0×");
-        jumperZoomText.setTextSize(11);
-        jumperZoomText.setGravity(Gravity.CENTER);
-        zoomRow.addView(zoomLabel, new LinearLayout.LayoutParams(dp(52), dp(30)));
-        zoomRow.addView(zoomMinus, new LinearLayout.LayoutParams(dp(42), dp(30)));
-        zoomRow.addView(jumperZoomText, new LinearLayout.LayoutParams(0, dp(30), 1f));
-        zoomRow.addView(zoomReset, new LinearLayout.LayoutParams(dp(60), dp(30)));
-        zoomRow.addView(zoomPlus, new LinearLayout.LayoutParams(dp(42), dp(30)));
-
+        LinearLayout toolRow1 = new LinearLayout(this);
+        toolRow1.setOrientation(LinearLayout.HORIZONTAL);
+        toolRow1.setGravity(Gravity.CENTER);
+        LinearLayout toolRow2 = new LinearLayout(this);
+        toolRow2.setOrientation(LinearLayout.HORIZONTAL);
+        toolRow2.setGravity(Gravity.CENTER);
         LinearLayout optionRow = new LinearLayout(this);
         optionRow.setOrientation(LinearLayout.HORIZONTAL);
-        optionRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView colorLabel = makeInfoText("Warna"); colorLabel.setTextSize(9); colorLabel.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);
-        Button red = makeButton("●"); Button yellow = makeButton("●"); Button green = makeButton("●"); Button blue = makeButton("●");
-        red.setTextColor(Color.RED); yellow.setTextColor(Color.YELLOW); green.setTextColor(Color.GREEN); blue.setTextColor(Color.CYAN);
-        Button small = makeButton("S"); Button medium = makeButton("M"); Button large = makeButton("L");
-        optionRow.addView(colorLabel, new LinearLayout.LayoutParams(dp(45), dp(30)));
-        for (Button b : new Button[]{red,yellow,green,blue}) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(30), .55f));
-        TextView sizeLabel = makeInfoText("Ukuran"); sizeLabel.setTextSize(9);
-        optionRow.addView(sizeLabel, new LinearLayout.LayoutParams(dp(48), dp(30)));
-        for (Button b : new Button[]{small,medium,large}) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(30), .45f));
+        optionRow.setGravity(Gravity.CENTER);
 
-        annotationBar.addView(modeHeader, new LinearLayout.LayoutParams(-1, dp(30)));
-        annotationBar.addView(toolRow, new LinearLayout.LayoutParams(-1, dp(40)));
-        annotationBar.addView(actionRow, new LinearLayout.LayoutParams(-1, dp(36)));
-        annotationBar.addView(zoomRow, new LinearLayout.LayoutParams(-1, dp(32)));
-        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(32)));
+        Button pan = makeButton("✋\nGeser");
+        Button select = makeButton("☝\nPilih");
+        Button marker = makeButton("●\nTitik");
+        Button arrow = makeButton("➜\nPanah");
+        Button circle = makeButton("○\nLingkar");
+        Button text = makeButton("T\nTeks");
+        Button ocr = makeButton("🔎\nOCR");
+        Button undo = makeButton("↩\nUndo");
+        Button redo = makeButton("↪\nRedo");
+        Button duplicate = makeButton("⧉\nDuplikat");
+        Button edit = makeButton("✎\nEdit");
+        Button clear = makeButton("✕\nHapus");
+        Button save = makeButton("💾\nSimpan");
+        Button share = makeButton("↗\nShare");
 
-        pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • 1 jari pan • 2 jari zoom gambar"));
-        marker.setOnClickListener(v -> setAnnotationMode(AnnotationMode.MARKER, "Titik aktif • tap titik komponen"));
+        Button[] row1 = {pan, select, marker, arrow, circle, text};
+        for (Button b : row1) {
+            b.setTextSize(10);
+            toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
+        }
+        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear, save, share};
+        for (Button b : row2) {
+            b.setTextSize(10);
+            toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
+        }
+
+        Button red = makeButton("●");
+        Button yellow = makeButton("●");
+        Button green = makeButton("●");
+        Button blue = makeButton("●");
+        Button small = makeButton("S");
+        Button medium = makeButton("M");
+        Button large = makeButton("L");
+        TextView legend = makeInfoText("Warna / Ukuran • 2 jari = putar");
+        legend.setTextSize(10);
+
+        Button[] opts = {red, yellow, green, blue, small, medium, large};
+        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.7f));
+        for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(22), .55f));
+
+        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(40)));
+        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(30)));
+        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
+
+        pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
+        marker.setOnClickListener(v -> setAnnotationMode(AnnotationMode.MARKER, "Marker aktif • tap titik komponen"));
         arrow.setOnClickListener(v -> setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"));
-        circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkar aktif • tarik mengelilingi komponen"));
-        text.setOnClickListener(v -> setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis"));
-        jumper.setOnClickListener(v -> setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tarik A → B • 2 jari zoom gambar"));
-        select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser • 2 jari putar/resize"));
+        circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"));
+        text.setOnClickListener(v -> setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"));
+        select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • 2 jari untuk putar"));
         ocr.setOnClickListener(v -> detectOcrOnFrozenImage());
         undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
         redo.setOnClickListener(v -> { annotationView.redo(); status.setText("Redo anotasi"); });
         duplicate.setOnClickListener(v -> { if (annotationView.duplicateSelected()) status.setText("Objek diduplikat"); else status.setText("Pilih objek dulu"); });
         edit.setOnClickListener(v -> editSelectedText());
-        clear.setOnClickListener(v -> {
-            if (annotationView.deleteSelected()) status.setText("Objek terpilih dihapus");
-            else { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); }
-        });
+        clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
         save.setOnClickListener(v -> saveAnnotatedFreeze());
         share.setOnClickListener(v -> shareAnnotatedFreeze());
 
-        zoomMinus.setOnClickListener(v -> changeFrozenZoom(-0.5f));
-        zoomPlus.setOnClickListener(v -> changeFrozenZoom(0.5f));
-        zoomReset.setOnClickListener(v -> { frozenZoom=1f; frozenPanX=0f; frozenPanY=0f; zoomBar.setProgress(0); updateFrozenImage(); status.setText("Zoom gambar di-reset"); });
-
+        red.setTextColor(Color.RED); yellow.setTextColor(Color.YELLOW); green.setTextColor(Color.GREEN); blue.setTextColor(Color.CYAN);
         red.setOnClickListener(v -> { annotationView.setColor(Color.RED); status.setText("Warna merah"); });
         yellow.setOnClickListener(v -> { annotationView.setColor(Color.YELLOW); status.setText("Warna kuning"); });
         green.setOnClickListener(v -> { annotationView.setColor(Color.GREEN); status.setText("Warna hijau"); });
@@ -560,111 +512,22 @@ public class MainActivity extends AppCompatActivity {
         medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
 
+        // In Freeze mode the editing toolbar moves into the former Exposure area.
+        // Zoom and Detail controls are hidden so the microscope preview becomes taller.
         annotationView = new AnnotationView(this);
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
         cameraBox.addView(annotationView, overlayParams);
-        annotationView.bringToFront();
         annotationView.setMode(annotationMode);
 
         int exposureIndex = rootLayout.indexOfChild(exposureRow);
+        // Freeze layout: maximize the PCB image by hiding all live-only status/adjustment rows.
         infoRow.setVisibility(View.GONE);
         exposureRow.setVisibility(View.GONE);
         zoomBar.setVisibility(View.GONE);
         detailRow.setVisibility(View.GONE);
 
-        // Slightly taller than the old toolbar, but much clearer and never clips text.
-        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(180));
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(92));
         rootLayout.addView(annotationBar, exposureIndex, barParams);
-        updateJumperZoomText();
-    }
-
-    private void updateJumperZoomText() {
-        if (jumperZoomText != null) jumperZoomText.setText(String.format("Zoom %.1f×", frozenZoom));
-    }
-
-    private void showJumperQuickGuide() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(8), dp(4), dp(8), dp(4));
-        TextView t = new TextView(this);
-        t.setTextColor(Color.WHITE);
-        t.setTextSize(15);
-        t.setPadding(0, dp(4), 0, dp(8));
-        t.setText("MODE JUMPER\n\n" +
-                "1. Tekan Beku untuk menghentikan gambar.\n" +
-                "2. Tekan 🔧 Jumper.\n" +
-                "3. Tarik dari titik A ke titik B pada jalur PCB.\n" +
-                "4. Gunakan Pilih untuk memindahkan atau memutar jumper.\n" +
-                "5. Gunakan Simpan untuk menyimpan hasil.\n\n" +
-                "Tips: zoom dulu agar titik jumper lebih presisi.");
-        box.addView(t);
-        new AlertDialog.Builder(this).setTitle("Jejak Teknisi • Mode Jumper")
-                .setView(box).setPositiveButton("Mulai", (d,w)->{
-                    if (frozen && annotationView != null) setAnnotationMode(AnnotationMode.JUMPER, "Mode Jumper aktif • tarik titik A → B");
-                    else status.setText("Beku gambar dulu untuk Mode Jumper");
-                }).setNegativeButton("Tutup", null).show();
-    }
-
-    private void showUserGuide() {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(6), dp(2), dp(6), dp(2));
-        TextView guide = new TextView(this);
-        guide.setTextColor(Color.WHITE);
-        guide.setTextSize(14);
-        guide.setLineSpacing(0, 1.08f);
-        guide.setText(
-                "PANDUAN JEJAK TEKNISI MICROSCOPE V3.2 PRO\n\n" +
-                "1. KAMERA LIVE\n" +
-                "• Kamera: tampilan microscope LIVE.\n" +
-                "• Fokus: fokus di tengah layar. Tap gambar untuk fokus di titik tertentu.\n" +
-                "• Lampu: nyalakan/matikan torch jika didukung perangkat.\n" +
-                "• − / +: atur zoom kamera.\n" +
-                "• Zoom bar: geser untuk memilih tingkat zoom.\n" +
-                "• Exposure: atur terang/gelap. AUTO mengembalikan exposure normal.\n" +
-                "• Detail: aktifkan tampilan kualitas/detail tinggi.\n\n" +
-                "2. BEKU / FREEZE\n" +
-                "• Tekan Beku untuk mengambil tampilan saat itu dan masuk mode inspeksi.\n" +
-                "• Pada Freeze, gambar dapat digeser dan dizoom dengan 1–2 jari. Di Mode Jumper tersedia tombol − / + / Reset dan pinch 2 jari.\n" +
-                "• Tekan LIVE untuk kembali ke kamera.\n\n" +
-                "3. EDIT & TANDAI PCB\n" +
-                "• Geser: pindahkan tampilan gambar.\n" +
-                "• Pilih: pilih objek lalu geser, putar, atau ubah ukuran dengan 2 jari.\n" +
-                "• Titik: tandai satu titik komponen/jalur.\n" +
-                "• Panah: tarik panah ke area yang ingin ditunjukkan.\n" +
-                "• Lingkar: lingkari IC, komponen, atau area PCB.\n" +
-                "• Teks: tambahkan catatan seperti VCC, GND, atau nama jalur.\n" +
-                "• Edit: ubah teks yang sedang dipilih.\n" +
-                "• Duplikat: gandakan objek terpilih.\n" +
-                "• Hapus: hapus semua anotasi.\n\n" +
-                "4. MODE JUMPER 🔧\n" +
-                "• Tekan Jumper, lalu tarik dari titik A ke titik B.\n" +
-                "• Titik A dan B diberi penanda agar jalur jumper jelas.\n" +
-                "• Pilih objek untuk memindahkan, memutar, atau mengubah ukurannya. 2 jari pada Mode Jumper dapat memperbesar/perkecil gambar PCB.\n" +
-                "• Cocok untuk menandai jalur putus, jumper resistor, konektor, dan IC.\n\n" +
-                "5. OCR\n" +
-                "• OCR membaca tulisan yang terlihat pada gambar Freeze.\n" +
-                "• Hasil dapat disalin dari dialog OCR.\n\n" +
-                "6. WARNA & UKURAN\n" +
-                "• Pilih warna untuk objek yang dipilih atau objek baru.\n" +
-                "• S/M/L mengubah ketebalan/ukuran objek.\n\n" +
-                "7. UNDO / REDO\n" +
-                "• Undo membatalkan perubahan terakhir.\n" +
-                "• Redo mengembalikan perubahan yang dibatalkan.\n\n" +
-                "8. SIMPAN & SHARE\n" +
-                "• Simpan menyimpan hasil anotasi ke galeri.\n" +
-                "• Share menyimpan hasil lalu membuka pilihan aplikasi untuk berbagi.\n\n" +
-                "9. CROSSHAIR + GRID\n" +
-                "• Crosshair membantu menentukan titik tengah/posisi.\n" +
-                "• Grid membantu melihat jarak dan posisi komponen.\n\n" +
-                "ALUR KERJA TEKNISI\n" +
-                "LIVE → Zoom/Fokus → Beku → Jumper/Panah/Titik/Teks → Pilih/Edit → OCR (opsional) → Simpan/Share → LIVE"
-        );
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(guide);
-        box.addView(scroll, new LinearLayout.LayoutParams(-1, dp(500)));
-        new AlertDialog.Builder(this).setTitle("Panduan Pengguna")
-                .setView(box).setPositiveButton("Selesai", null).show();
     }
 
     private void detectOcrOnFrozenImage() {
@@ -672,7 +535,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Bekukan gambar dulu");
             return;
         }
-        Bitmap cropBitmap = getFrozenZoomedBitmap();
+        Bitmap cropBitmap = getFrozenZoomedBitmap(OCR_MAX_DIMENSION);
         CropInfo crop = getCurrentCropInfo();
         if (cropBitmap == null || crop == null) {
             status.setText("Area gambar belum siap");
@@ -773,11 +636,15 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
+        try {
+            if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
+        } finally {
+            if (!result.isRecycled()) result.recycle();
+        }
     }
 
     private Bitmap buildAnnotatedBitmap() {
-        Bitmap base = getFrozenZoomedBitmap();
+        Bitmap base = getFrozenZoomedBitmap(MAX_FREEZE_DIMENSION);
         if (base == null) return null;
         Bitmap result = base.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(result);
@@ -864,7 +731,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Bitmap result = buildAnnotatedBitmap();
-        Uri uri = result == null ? null : saveBitmapToGallery(result);
+        Uri uri = null;
+        try {
+            uri = result == null ? null : saveBitmapToGallery(result);
+        } finally {
+            if (result != null && !result.isRecycled()) result.recycle();
+        }
         if (uri == null) return;
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("image/jpeg");
@@ -987,24 +859,11 @@ public class MainActivity extends AppCompatActivity {
         private float lastTransformDistance = 0f;
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> undoStack = new java.util.ArrayDeque<>();
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> redoStack = new java.util.ArrayDeque<>();
-        private final ScaleGestureDetector annotationScaleDetector;
 
         AnnotationView(Context context) {
             super(context);
-            setClickable(true);
-            setFocusable(true);
             setBackground(new ColorDrawable(Color.TRANSPARENT));
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-            annotationScaleDetector = new ScaleGestureDetector(MainActivity.this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                @Override public boolean onScale(ScaleGestureDetector detector) {
-                    if (!frozen || mode != AnnotationMode.JUMPER) return false;
-                    frozenZoom = Math.max(1f, Math.min(8f, frozenZoom * detector.getScaleFactor()));
-                    zoomBar.setProgress((int)(((frozenZoom - 1f) / 7f) * 100f));
-                    updateFrozenImage();
-                    updateJumperZoomText();
-                    return true;
-                }
-            });
         }
 
         void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; invalidate(); }
@@ -1038,14 +897,6 @@ public class MainActivity extends AppCompatActivity {
             undoStack.push(copyItems()); items.clear(); items.addAll(redoStack.pop()); selected=null; invalidate();
         }
         void clearAll() { if (!items.isEmpty()) pushUndo(); items.clear(); selected=null; invalidate(); }
-        boolean deleteSelected() {
-            if (selected == null) return false;
-            pushUndo();
-            items.remove(selected);
-            selected = null;
-            invalidate();
-            return true;
-        }
         boolean duplicateSelected() {
             if (selected==null) return false;
             pushUndo(); Annotation c=selected.copy(); float dx=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
@@ -1054,24 +905,6 @@ public class MainActivity extends AppCompatActivity {
         boolean hasSelectedText(){ return selected!=null && selected.type==AnnotationMode.TEXT; }
         Annotation getSelectedText(){ return selected; }
         void changeSelectedText(String value){ if(hasSelectedText()){ pushUndo(); selected.text=value; invalidate(); } }
-
-        private float[] clampToImageView(float x, float y) {
-            float minX = 0f, maxX = getWidth(), minY = 0f, maxY = getHeight();
-            // Derive the actual transformed bitmap bounds. This prevents a jumper
-            // endpoint from being created in any black/non-image area.
-            if (frozenBitmap != null) {
-                float[] pts = new float[]{0f,0f,frozenBitmap.getWidth(),0f,0f,frozenBitmap.getHeight(),frozenBitmap.getWidth(),frozenBitmap.getHeight()};
-                frozenMatrix.mapPoints(pts);
-                minX = Math.max(0f, Math.min(Math.min(pts[0],pts[2]), Math.min(pts[4],pts[6])));
-                maxX = Math.min(getWidth(), Math.max(Math.max(pts[0],pts[2]), Math.max(pts[4],pts[6])));
-                minY = Math.max(0f, Math.min(Math.min(pts[1],pts[3]), Math.min(pts[5],pts[7])));
-                maxY = Math.min(getHeight(), Math.max(Math.max(pts[1],pts[3]), Math.max(pts[5],pts[7])));
-            }
-            if (maxX <= minX) { minX=0f; maxX=getWidth(); }
-            if (maxY <= minY) { minY=0f; maxY=getHeight(); }
-            float margin = dp(6);
-            return new float[]{Math.max(minX+margin, Math.min(maxX-margin, x)), Math.max(minY+margin, Math.min(maxY-margin, y))};
-        }
 
         private float[] viewToSource(float x, float y) {
             Matrix inv = new Matrix();
@@ -1128,39 +961,6 @@ public class MainActivity extends AppCompatActivity {
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang-.45),a.y2-len*(float)Math.sin(ang-.45),paint);
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang+.45),a.y2-len*(float)Math.sin(ang+.45),paint);
                 canvas.restore();
-            } else if (a.type==AnnotationMode.JUMPER) {
-                canvas.save();
-                float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
-                canvas.rotate(a.rotation, cx, cy);
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(dp((int)Math.max(4f,a.size)) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
-                canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
-                paint.setStyle(Paint.Style.FILL);
-                float rr=dp(5)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-                canvas.drawCircle(a.x1,a.y1,rr,paint);
-                canvas.drawCircle(a.x2,a.y2,rr,paint);
-                // Keep the image clean: show the label only for the selected jumper.
-                if (a == selected) {
-                    float midX=(a.x1+a.x2)/2f, midY=(a.y1+a.y2)/2f;
-                    float boxW=dp(42)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-                    float boxH=dp(20)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-                    paint.setColor(Color.argb(205,0,0,0));
-                    canvas.drawRoundRect(new RectF(midX-boxW/2, midY-boxH/2, midX+boxW/2, midY+boxH/2), boxH/2, boxH/2, paint);
-                    paint.setColor(a.color);
-                    paint.setTextSize(dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f)));
-                    paint.setTypeface(Typeface.DEFAULT_BOLD);
-                    String label="JMP";
-                    canvas.drawText(label, midX-paint.measureText(label)/2f, midY+paint.getTextSize()/3f, paint);
-                }
-                // Selection handles make rotate/resize easier to understand.
-                if (a == selected) {
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(dp(1)/Math.max(0.35f,frozenMatrix.mapRadius(1f)));
-                    paint.setColor(Color.WHITE);
-                    canvas.drawCircle(a.x1,a.y1,dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f)),paint);
-                    canvas.drawCircle(a.x2,a.y2,dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f)),paint);
-                }
-                canvas.restore();
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.TEXT) {
@@ -1205,13 +1005,7 @@ public class MainActivity extends AppCompatActivity {
             float tolerance=dp(28)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
             for (int i=items.size()-1;i>=0;i--) {
                 Annotation a=items.get(i);
-                if (a.type==AnnotationMode.JUMPER) {
-                    float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
-                    double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
-                    float rx=(float)(cx+(p[0]-cx)*cs-(p[1]-cy)*sn);
-                    float ry=(float)(cy+(p[0]-cx)*sn+(p[1]-cy)*cs);
-                    if (distancePointToSegment(rx,ry,a.x1,a.y1,a.x2,a.y2)<=tolerance*1.4f) return a;
-                } else if (a.type==AnnotationMode.ARROW) {
+                if (a.type==AnnotationMode.ARROW) {
                     // Test against the actual rotated shaft.
                     float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
@@ -1239,47 +1033,6 @@ public class MainActivity extends AppCompatActivity {
         @Override public boolean onTouchEvent(MotionEvent e) {
             if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
-            if (mode==AnnotationMode.JUMPER) {
-                annotationScaleDetector.onTouchEvent(e);
-                int action = e.getActionMasked();
-                // One finger = draw jumper. Two fingers = zoom the frozen PCB image.
-                if (e.getPointerCount() >= 2 || annotationScaleDetector.isInProgress()) {
-                    drawing = false;
-                    return true;
-                }
-                if (action == MotionEvent.ACTION_DOWN) {
-                    float[] q = clampToImageView(x, y);
-                    startX=q[0]; startY=q[1]; endX=q[0]; endY=q[1];
-                    drawing=true;
-                    selected=null;
-                    invalidate();
-                    return true;
-                }
-                if (action == MotionEvent.ACTION_MOVE && drawing) {
-                    float[] q = clampToImageView(x, y);
-                    endX=q[0]; endY=q[1];
-                    invalidate();
-                    return true;
-                }
-                if (action == MotionEvent.ACTION_UP && drawing) {
-                    float[] q=clampToImageView(x,y);
-                    endX=q[0]; endY=q[1];
-                    float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
-                    float minLen = dp(12)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-                    if (Math.hypot(b[0]-a[0],b[1]-a[1]) >= minLen) {
-                        pushUndo();
-                        Annotation created=Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],currentColor,strokeDp);
-                        items.add(created);
-                        selected=created;
-                        status.setText("Jumper " + items.size() + " dibuat • Pilih untuk edit");
-                    } else {
-                        status.setText("Tarik Jumper lebih panjang: A → B");
-                    }
-                    drawing=false;
-                    invalidate();
-                    return true;
-                }
-            }
             if (mode==AnnotationMode.SELECT) {
                 int action=e.getActionMasked();
                 if (action==MotionEvent.ACTION_DOWN) {
@@ -1339,25 +1092,10 @@ public class MainActivity extends AppCompatActivity {
         if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
             if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); pushUndo(); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
             switch(e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    if (mode == AnnotationMode.JUMPER) { float[] q=clampToImageView(x,y); startX=q[0]; startY=q[1]; endX=q[0]; endY=q[1]; }
-                    else { startX=x; startY=y; endX=x; endY=y; }
-                    drawing=true; return true;
-                case MotionEvent.ACTION_MOVE:
-                    if (mode == AnnotationMode.JUMPER) { float[] q=clampToImageView(x,y); endX=q[0]; endY=q[1]; }
-                    else { endX=x; endY=y; }
-                    invalidate(); return true;
+                case MotionEvent.ACTION_DOWN: startX=x;startY=y;endX=x;endY=y;drawing=true;return true;
+                case MotionEvent.ACTION_MOVE: endX=x;endY=y;invalidate();return true;
                 case MotionEvent.ACTION_UP:
-                    if (mode == AnnotationMode.JUMPER) { float[] q=clampToImageView(x,y); endX=q[0]; endY=q[1]; }
-                    else { endX=x; endY=y; }
-                    if(drawing){
-                        float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
-                        float minLen = dp(12)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-                        if (Math.hypot(b[0]-a[0], b[1]-a[1]) >= minLen) {
-                            pushUndo(); items.add(Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));
-                        }
-                    }
-                    drawing=false; invalidate(); return true;
+                    endX=x;endY=y; if(drawing){float[] a=viewToSource(startX,startY),b=viewToSource(endX,endY);pushUndo(); items.add(Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));} drawing=false;invalidate();return true;
             }
             return true;
         }
@@ -1415,8 +1153,14 @@ public class MainActivity extends AppCompatActivity {
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setJpegQuality(98);
                 Camera2Interop.Extender<ImageCapture> extender = new Camera2Interop.Extender<>(captureBuilder);
-                extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY);
-                extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
+                // Optional Camera2 tuning. Some devices reject these keys, so a failure
+                // must never prevent the normal CameraX capture pipeline from starting.
+                try {
+                    extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+                    extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
+                } catch (RuntimeException ignored) {
+                    // Keep the default CameraX settings for incompatible devices.
+                }
                 capture = captureBuilder.build();
 
                 provider.unbindAll();
@@ -1482,12 +1226,22 @@ public class MainActivity extends AppCompatActivity {
 
     private void setExposure(int value) {
         if (camera == null) return;
-        int range = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getUpper();
-        int lower = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
-        int clamped = Math.max(lower, Math.min(range, value));
+        androidx.camera.core.ExposureState state = camera.getCameraInfo().getExposureState();
+        exposureLower = state.getExposureCompensationRange().getLower();
+        exposureUpper = state.getExposureCompensationRange().getUpper();
+        int span = Math.max(1, exposureUpper - exposureLower);
+        int clamped = Math.max(exposureLower, Math.min(exposureUpper, value));
         camera.getCameraControl().setExposureCompensationIndex(clamped);
-        exposureBar.setProgress(clamped + 4);
+        int progress = Math.round((clamped - exposureLower) * 100f / span);
+        exposureBar.setProgress(Math.max(0, Math.min(100, progress)));
         exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
+    }
+
+    private void setExposureFromProgress(int progress) {
+        if (camera == null) return;
+        int span = Math.max(1, exposureUpper - exposureLower);
+        int value = exposureLower + Math.round(span * (progress / 100f));
+        setExposure(value);
     }
 
     private void setFreezeFullscreen(boolean freezeMode) {
@@ -1508,12 +1262,12 @@ public class MainActivity extends AppCompatActivity {
             if (freezeMode) {
                 lp.width = 0;
                 lp.weight = 1f;
-                lp.height = dp(52);
+                lp.height = dp(56);
                 freezeBtn.setText("▶️  LIVE");
             } else {
                 lp.width = 0;
                 lp.weight = 1f;
-                lp.height = dp(54);
+                lp.height = dp(62);
                 freezeBtn.setText("❄️\nBeku");
             }
             freezeBtn.setLayoutParams(lp);
@@ -1531,7 +1285,11 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            frozenBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            frozenBitmap = prepareFreezeBitmap(bitmap);
+            if (frozenBitmap == null) {
+                status.setText("Gagal menyiapkan gambar beku");
+                return;
+            }
             freezeView = new ImageView(this);
             freezeView.setImageBitmap(frozenBitmap);
             freezeView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -1560,7 +1318,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("❄️ BEKU • pilih alat untuk menandai PCB");
         } else {
             hideAnnotationTools();
-            frozenBitmap = null;
+            releaseFrozenBitmap();
             if (freezeView != null) {
                 ViewParent parent = freezeView.getParent();
                 if (parent instanceof FrameLayout) {
@@ -1582,7 +1340,6 @@ public class MainActivity extends AppCompatActivity {
         if (!frozen) return;
         frozenZoom = 1f + (7f * progress / 100f);
         updateFrozenImage();
-        updateJumperZoomText();
     }
 
     private void changeFrozenZoom(float delta) {
@@ -1590,7 +1347,6 @@ public class MainActivity extends AppCompatActivity {
         frozenZoom = Math.max(1f, Math.min(8f, frozenZoom + delta));
         zoomBar.setProgress((int) (((frozenZoom - 1f) / 7f) * 100f));
         updateFrozenImage();
-        updateJumperZoomText();
     }
 
     private void updateFrozenImage() {
@@ -1626,9 +1382,59 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap getFrozenZoomedBitmap() {
+        return getFrozenZoomedBitmap(MAX_FREEZE_DIMENSION);
+    }
+
+    private Bitmap getFrozenZoomedBitmap(int maxDimension) {
         CropInfo crop = getCurrentCropInfo();
-        if (crop == null) return null;
-        return Bitmap.createBitmap(frozenBitmap, crop.left, crop.top, crop.width, crop.height);
+        if (crop == null || frozenBitmap == null || frozenBitmap.isRecycled()) return null;
+        try {
+            Bitmap source = frozenBitmap;
+            int left = crop.left, top = crop.top, width = crop.width, height = crop.height;
+            float scale = Math.min(1f, maxDimension / (float) Math.max(width, height));
+            if (scale < 1f) {
+                width = Math.max(1, Math.round(width * scale));
+                height = Math.max(1, Math.round(height * scale));
+                Bitmap scaled = Bitmap.createBitmap(source, left, top, crop.width, crop.height);
+                Bitmap result = Bitmap.createScaledBitmap(scaled, width, height, true);
+                if (scaled != result && !scaled.isRecycled()) scaled.recycle();
+                return result;
+            }
+            return Bitmap.createBitmap(source, left, top, width, height);
+        } catch (OutOfMemoryError e) {
+            status.setText("Gambar terlalu besar untuk memori HP");
+            return null;
+        } catch (RuntimeException e) {
+            status.setText("Gagal memproses gambar");
+            return null;
+        }
+    }
+
+    private Bitmap prepareFreezeBitmap(Bitmap source) {
+        if (source == null || source.isRecycled()) return null;
+        try {
+            int w = source.getWidth(), h = source.getHeight();
+            float scale = Math.min(1f, MAX_FREEZE_DIMENSION / (float) Math.max(w, h));
+            int nw = Math.max(1, Math.round(w * scale));
+            int nh = Math.max(1, Math.round(h * scale));
+            if (nw == w && nh == h) {
+                return source.copy(Bitmap.Config.ARGB_8888, false);
+            }
+            return Bitmap.createScaledBitmap(source, nw, nh, true);
+        } catch (OutOfMemoryError e) {
+            status.setText("RAM tidak cukup untuk Freeze");
+            return null;
+        } catch (RuntimeException e) {
+            status.setText("Gagal menyiapkan Freeze");
+            return null;
+        }
+    }
+
+    private void releaseFrozenBitmap() {
+        if (frozenBitmap != null && !frozenBitmap.isRecycled()) {
+            frozenBitmap.recycle();
+        }
+        frozenBitmap = null;
     }
 
     private void saveBitmap(Bitmap bitmap) {
@@ -1647,8 +1453,10 @@ public class MainActivity extends AppCompatActivity {
             Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
             if (uri == null) { status.setText("Gagal menyimpan foto"); return null; }
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
-                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 98, out)) {
-                    status.setText("Gagal menyimpan foto"); return null;
+                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) {
+                    getContentResolver().delete(uri, null, null);
+                    status.setText("Gagal menyimpan foto");
+                    return null;
                 }
             }
             return uri;
@@ -1696,7 +1504,12 @@ public class MainActivity extends AppCompatActivity {
     private void takePhoto() {
         if (frozen && frozenBitmap != null) {
             Bitmap zoomed = getFrozenZoomedBitmap();
-            saveBitmap(zoomed != null ? zoomed : frozenBitmap);
+            if (zoomed != null) {
+                saveBitmap(zoomed);
+                if (!zoomed.isRecycled()) zoomed.recycle();
+            } else {
+                saveBitmap(frozenBitmap);
+            }
             return;
         }
 
@@ -1762,17 +1575,37 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendToGoogleLens(Uri uri) {
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("image/jpeg");
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        intent.setPackage("com.google.android.googlequicksearchbox");
+        if (uri == null) {
+            status.setText("Foto tidak tersedia");
+            return;
+        }
+
+        Intent lensIntent = new Intent(Intent.ACTION_SEND);
+        lensIntent.setType("image/jpeg");
+        lensIntent.putExtra(Intent.EXTRA_STREAM, uri);
+        lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        lensIntent.setPackage("com.google.android.googlequicksearchbox");
 
         try {
-            startActivity(intent);
-        } catch (Exception e) {
-            intent.setPackage(null);
-            startActivity(Intent.createChooser(intent, "Buka foto dengan"));
+            if (lensIntent.resolveActivity(getPackageManager()) != null) {
+                startActivity(lensIntent);
+                return;
+            }
+        } catch (RuntimeException ignored) {
+        }
+
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("image/jpeg");
+        shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            if (shareIntent.resolveActivity(getPackageManager()) == null) {
+                status.setText("Tidak ada aplikasi untuk membuka foto");
+                return;
+            }
+            startActivity(Intent.createChooser(shareIntent, "Buka foto dengan"));
+        } catch (ActivityNotFoundException | SecurityException e) {
+            status.setText("Google Lens/aplikasi foto tidak tersedia");
         }
     }
 
@@ -1801,6 +1634,9 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {
         }
+        releaseFrozenBitmap();
+        camera = null;
+        capture = null;
         super.onDestroy();
     }
 }

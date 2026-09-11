@@ -1,6 +1,6 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.jejakteknisi.magnifier'; compileSdk 35
- defaultConfig { applicationId 'com.jejakteknisi.magnifier'; minSdk 23; targetSdk 35; versionCode 321; versionName '3.2.1' }
+ defaultConfig { applicationId 'com.jejakteknisi.magnifier'; minSdk 23; targetSdk 35; versionCode 301; versionName '3.0.1' }
 }
 dependencies {
  implementation 'androidx.appcompat:appcompat:1.7.0'
