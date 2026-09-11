@@ -99,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
     private Button cameraFocusBtn;
     private Button cameraPlusBtn;
     private boolean torch = false;
+    private int navigationBarBottomInset = 0;
 
     // V2.5 PCB inspection / annotation
     private FrameLayout cameraBox;
@@ -835,10 +836,8 @@ public class MainActivity extends AppCompatActivity {
                 topBar.setPadding(dp(8), bars.top + dp(3), dp(8), dp(3));
             }
 
-            if (controlsBar != null) {
-                // Extra bottom padding pushes the five controls above the nav bar.
-                controlsBar.setPadding(dp(4), dp(4), dp(4), bars.bottom + dp(6));
-            }
+            navigationBarBottomInset = bars.bottom;
+            updateControlsBarPadding();
 
             return insets;
         });
@@ -846,6 +845,14 @@ public class MainActivity extends AppCompatActivity {
 
         getWindow().setStatusBarColor(Color.BLACK);
         getWindow().setNavigationBarColor(Color.BLACK);
+    }
+
+    private void updateControlsBarPadding() {
+        if (controlsBar != null) {
+            // Keep the bottom camera/edit controls above Android's navigation bar
+            // in BOTH LIVE and FREEZE modes. setFreezeFullscreen() must not reset this.
+            controlsBar.setPadding(dp(4), dp(4), dp(4), navigationBarBottomInset + dp(6));
+        }
     }
 
     private void startCamera() {
@@ -966,7 +973,7 @@ public class MainActivity extends AppCompatActivity {
             }
             freezeBtn.setLayoutParams(lp);
         }
-        if (controlsBar != null) controlsBar.setPadding(dp(4), dp(3), dp(4), dp(6));
+        updateControlsBarPadding();
     }
 
     private void toggleFreeze() {
