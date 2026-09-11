@@ -449,7 +449,7 @@ public class MainActivity extends AppCompatActivity {
         Button small = makeButton("S");
         Button medium = makeButton("M");
         Button large = makeButton("L");
-        TextView legend = makeInfoText("Warna / Ukuran");
+        TextView legend = makeInfoText("Warna / Ukuran • 2 jari = putar");
         legend.setTextSize(10);
 
         Button[] opts = {red, yellow, green, blue, small, medium, large};
@@ -465,7 +465,7 @@ public class MainActivity extends AppCompatActivity {
         arrow.setOnClickListener(v -> setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"));
         circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"));
         text.setOnClickListener(v -> setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"));
-        select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser tanda untuk memindahkannya"));
+        select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • 2 jari untuk putar"));
         ocr.setOnClickListener(v -> detectOcrOnFrozenImage());
         undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
         clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
@@ -689,6 +689,8 @@ public class MainActivity extends AppCompatActivity {
         private float strokeDp = 5f;
         private Annotation selected;
         private float lastSelectX, lastSelectY;
+        private float lastRotateAngle = 0f;
+        private boolean rotatingSelected = false;
 
         AnnotationView(Context context) {
             super(context);
@@ -696,7 +698,7 @@ public class MainActivity extends AppCompatActivity {
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
 
-        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; invalidate(); }
+        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; invalidate(); }
         void addOcr(float x1, float y1, float x2, float y2, String text) {
             items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
         }
@@ -753,14 +755,22 @@ public class MainActivity extends AppCompatActivity {
             if (a.type==AnnotationMode.MARKER) {
                 paint.setStyle(Paint.Style.FILL); canvas.drawCircle(a.x1,a.y1,dp((int)a.size),paint);
             } else if (a.type==AnnotationMode.ARROW) {
+                canvas.save();
+                float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                canvas.rotate(a.rotation, cx, cy);
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
                 double ang=Math.atan2(a.y2-a.y1,a.x2-a.x1); float len=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang-.45),a.y2-len*(float)Math.sin(ang-.45),paint);
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang+.45),a.y2-len*(float)Math.sin(ang+.45),paint);
+                canvas.restore();
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.TEXT) {
-                paint.setStyle(Paint.Style.FILL); paint.setShadowLayer(dp(3),1,1,Color.BLACK); canvas.drawText(a.text,a.x1,a.y1,paint); paint.clearShadowLayer();
+                paint.setStyle(Paint.Style.FILL);
+                canvas.save();
+                canvas.rotate(a.rotation, a.x1, a.y1);
+                paint.setShadowLayer(dp(3),1,1,Color.BLACK); canvas.drawText(a.text,a.x1,a.y1,paint); paint.clearShadowLayer();
+                canvas.restore();
             } else if (a.type==AnnotationMode.OCR) {
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeWidth(dp(2) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
@@ -800,11 +810,33 @@ public class MainActivity extends AppCompatActivity {
             if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
             if (mode==AnnotationMode.SELECT) {
-                switch(e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN: selected=hitTest(x,y); lastSelectX=x; lastSelectY=y; return true;
+                int action = e.getActionMasked();
+                if (action == MotionEvent.ACTION_DOWN) {
+                    selected=hitTest(x,y); lastSelectX=x; lastSelectY=y; rotatingSelected=false;
+                    return true;
+                }
+                if (selected != null && e.getPointerCount() >= 2 &&
+                        (action == MotionEvent.ACTION_POINTER_DOWN || action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_POINTER_UP)) {
+                    if (e.getPointerCount() >= 2) {
+                        float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
+                        float angle=(float)Math.toDegrees(Math.atan2(y1-y0, x1-x0));
+                        if (!rotatingSelected || action == MotionEvent.ACTION_POINTER_DOWN) {
+                            lastRotateAngle=angle; rotatingSelected=true;
+                        } else {
+                            float delta=angle-lastRotateAngle;
+                            while(delta>180f) delta-=360f; while(delta<-180f) delta+=360f;
+                            selected.rotation += delta;
+                            lastRotateAngle=angle; invalidate();
+                        }
+                    }
+                    return true;
+                }
+                switch(action) {
                     case MotionEvent.ACTION_MOVE:
-                        if (selected!=null) { float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y); float dx=p2[0]-p1[0],dy=p2[1]-p1[1]; selected.x1+=dx;selected.y1+=dy;selected.x2+=dx;selected.y2+=dy; lastSelectX=x;lastSelectY=y;invalidate(); } return true;
-                    case MotionEvent.ACTION_UP: selected=null; return true;
+                        if (selected!=null && !rotatingSelected) { float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y); float dx=p2[0]-p1[0],dy=p2[1]-p1[1]; selected.x1+=dx;selected.y1+=dy;selected.x2+=dx;selected.y2+=dy; lastSelectX=x;lastSelectY=y;invalidate(); } return true;
+                    case MotionEvent.ACTION_POINTER_UP:
+                        rotatingSelected=false; return true;
+                    case MotionEvent.ACTION_UP: selected=null; rotatingSelected=false; return true;
                 }
                 return true;
             }
@@ -821,7 +853,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static class Annotation {
-        AnnotationMode type; float x1,y1,x2,y2; String text; int color=Color.RED; float size=5f;
+        AnnotationMode type; float x1,y1,x2,y2; String text; int color=Color.RED; float size=5f; float rotation=0f;
         static Annotation marker(float x,float y,int c,float s){return shape(AnnotationMode.MARKER,x,y,x,y,c,s);}
         static Annotation text(float x,float y,String t,int c,float s){Annotation a=marker(x,y,c,s);a.type=AnnotationMode.TEXT;a.text=t;return a;}
         static Annotation ocr(float x1,float y1,float x2,float y2,String t,int c,float s){Annotation a=shape(AnnotationMode.OCR,x1,y1,x2,y2,c,s);a.text=t;return a;}
