@@ -5,6 +5,7 @@ import android.app.AlertDialog;
 import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -18,6 +19,9 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.view.View;
+import android.view.ScaleGestureDetector;
+import android.graphics.Matrix;
 
 import androidx.annotation.NonNull;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -54,6 +58,18 @@ public class MainActivity extends AppCompatActivity {
     private SeekBar exposureBar;
     private Button torchBtn;
     private Button photoBtn;
+    private Button freezeBtn;
+    private ImageView freezeView;
+    private boolean frozen = false;
+    private Bitmap frozenBitmap;
+    private float frozenZoom = 1f;
+    private float frozenPanX = 0f;
+    private float frozenPanY = 0f;
+    private float lastTouchX;
+    private float lastTouchY;
+    private boolean movingFrozen = false;
+    private ScaleGestureDetector frozenScaleDetector;
+    private final Matrix frozenMatrix = new Matrix();
     private Button detailBtn;
     private Button autoExposureBtn;
     private SeekBar detailBar;
@@ -139,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.3");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.4");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -239,25 +255,39 @@ public class MainActivity extends AppCompatActivity {
 
         Button minus = makeButton("−");
         torchBtn = makeButton("🔦\nLampu");
+        freezeBtn = makeButton("❄️\nBeku");
         photoBtn = makeButton("📸\nFOTO");
         Button focus = makeButton("🎯\nFokus");
         Button plus = makeButton("+");
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .75f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.55f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.15f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .75f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .55f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.25f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .55f));
 
         LinearLayout.LayoutParams controlParams =
                 new LinearLayout.LayoutParams(-1, -2);
         root.addView(controls, controlParams);
         setContentView(root);
 
+        frozenScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                if (!frozen) return false;
+                frozenZoom = Math.max(1f, Math.min(8f, frozenZoom * detector.getScaleFactor()));
+                updateFrozenImage();
+                return true;
+            }
+        });
+
         zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) setZoomFromProgress(progress);
+                if (fromUser) {
+                    if (frozen) setFrozenZoomFromProgress(progress);
+                    else setZoomFromProgress(progress);
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -288,9 +318,14 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        minus.setOnClickListener(v -> changeZoom(-0.5f));
-        plus.setOnClickListener(v -> changeZoom(0.5f));
+        minus.setOnClickListener(v -> {
+            if (frozen) changeFrozenZoom(-0.5f); else changeZoom(-0.5f);
+        });
+        plus.setOnClickListener(v -> {
+            if (frozen) changeFrozenZoom(0.5f); else changeZoom(0.5f);
+        });
         torchBtn.setOnClickListener(v -> toggleTorch());
+        freezeBtn.setOnClickListener(v -> toggleFreeze());
         focus.setOnClickListener(v -> {
             if (preview != null) {
                 focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f);
@@ -299,6 +334,31 @@ public class MainActivity extends AppCompatActivity {
         photoBtn.setOnClickListener(v -> takePhoto());
 
         preview.setOnTouchListener((v, event) -> {
+            if (frozen) {
+                frozenScaleDetector.onTouchEvent(event);
+                if (event.getPointerCount() == 1) {
+                    switch (event.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN:
+                            lastTouchX = event.getX();
+                            lastTouchY = event.getY();
+                            movingFrozen = false;
+                            return true;
+                        case MotionEvent.ACTION_MOVE:
+                            float dx = event.getX() - lastTouchX;
+                            float dy = event.getY() - lastTouchY;
+                            if (Math.abs(dx) + Math.abs(dy) > dp(2)) movingFrozen = true;
+                            frozenPanX += dx;
+                            frozenPanY += dy;
+                            lastTouchX = event.getX();
+                            lastTouchY = event.getY();
+                            updateFrozenImage();
+                            return true;
+                        case MotionEvent.ACTION_UP:
+                            return true;
+                    }
+                }
+                return true;
+            }
             if (event.getAction() == MotionEvent.ACTION_UP) {
                 focusAt(event.getX(), event.getY());
             }
@@ -359,7 +419,7 @@ public class MainActivity extends AppCompatActivity {
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
                 setExposure(0);
-                status.setText("Kamera siap • tap untuk fokus • Detail ON");
+                status.setText("Kamera LIVE • tap untuk fokus • Detail ON");
 
             } catch (Exception e) {
                 status.setText("Kamera gagal");
@@ -418,6 +478,137 @@ public class MainActivity extends AppCompatActivity {
         exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
     }
 
+    private void toggleFreeze() {
+        if (preview == null) return;
+
+        if (!frozen) {
+            Bitmap bitmap = preview.getBitmap();
+            if (bitmap == null) {
+                status.setText("Frame belum siap");
+                return;
+            }
+
+            frozenBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            freezeView = new ImageView(this);
+            freezeView.setImageBitmap(frozenBitmap);
+            freezeView.setScaleType(ImageView.ScaleType.MATRIX);
+            freezeView.setBackgroundColor(Color.BLACK);
+            FrameLayout parent = (FrameLayout) preview.getParent();
+            parent.addView(freezeView, new FrameLayout.LayoutParams(-1, -1));
+            frozen = true;
+            frozenZoom = 1f;
+            frozenPanX = 0f;
+            frozenPanY = 0f;
+            zoomBar.setProgress(0);
+            updateFrozenImage();
+            freezeBtn.setText("▶️\nLIVE");
+            status.setText("❄️ BEKU • zoom + geser gambar • FOTO untuk simpan");
+        } else {
+            frozenBitmap = null;
+            if (freezeView != null) {
+                View parent = freezeView.getParent();
+                if (parent instanceof FrameLayout) {
+                    ((FrameLayout) parent).removeView(freezeView);
+                }
+                freezeView = null;
+            }
+            frozen = false;
+            frozenZoom = 1f;
+            frozenPanX = 0f;
+            frozenPanY = 0f;
+            freezeBtn.setText("❄️\nBeku");
+            updateZoomText();
+            status.setText("Kamera LIVE");
+        }
+    }
+
+    private void setFrozenZoomFromProgress(int progress) {
+        if (!frozen) return;
+        frozenZoom = 1f + (7f * progress / 100f);
+        updateFrozenImage();
+    }
+
+    private void changeFrozenZoom(float delta) {
+        if (!frozen) return;
+        frozenZoom = Math.max(1f, Math.min(8f, frozenZoom + delta));
+        zoomBar.setProgress((int) (((frozenZoom - 1f) / 7f) * 100f));
+        updateFrozenImage();
+    }
+
+    private void updateFrozenImage() {
+        if (!frozen || freezeView == null || frozenBitmap == null) return;
+        int vw = freezeView.getWidth();
+        int vh = freezeView.getHeight();
+        if (vw <= 0 || vh <= 0) return;
+
+        float base = Math.max((float) vw / frozenBitmap.getWidth(),
+                (float) vh / frozenBitmap.getHeight());
+        float scale = base * frozenZoom;
+        float drawW = frozenBitmap.getWidth() * scale;
+        float drawH = frozenBitmap.getHeight() * scale;
+        float centerX = (vw - drawW) / 2f + frozenPanX;
+        float centerY = (vh - drawH) / 2f + frozenPanY;
+
+        // Limit panning so the image never leaves empty gaps.
+        float minX = vw - drawW;
+        float minY = vh - drawH;
+        float maxX = 0f;
+        if (drawW <= vw) centerX = (vw - drawW) / 2f;
+        else centerX = Math.max(minX, Math.min(maxX, centerX));
+        if (drawH <= vh) centerY = (vh - drawH) / 2f;
+        else centerY = Math.max(minY, Math.min(0f, centerY));
+
+        frozenMatrix.reset();
+        frozenMatrix.setScale(scale, scale);
+        frozenMatrix.postTranslate(centerX, centerY);
+        freezeView.setImageMatrix(frozenMatrix);
+
+        zoomText.setText(String.format("Freeze Zoom %.1f×", frozenZoom));
+        status.setText(String.format("❄️ BEKU • %.1f× • geser untuk melihat area", frozenZoom));
+    }
+
+    private Bitmap getFrozenZoomedBitmap() {
+        if (frozenBitmap == null) return null;
+        int w = frozenBitmap.getWidth();
+        int h = frozenBitmap.getHeight();
+        float cropScale = 1f / frozenZoom;
+        int cropW = Math.max(1, Math.min(w, Math.round(w * cropScale)));
+        int cropH = Math.max(1, Math.min(h, Math.round(h * cropScale)));
+        float cx = w / 2f - frozenPanX / Math.max(1f, freezeView == null ? 1f : freezeView.getWidth()) * w;
+        float cy = h / 2f - frozenPanY / Math.max(1f, freezeView == null ? 1f : freezeView.getHeight()) * h;
+        int left = Math.max(0, Math.min(w - cropW, Math.round(cx - cropW / 2f)));
+        int top = Math.max(0, Math.min(h - cropH, Math.round(cy - cropH / 2f)));
+        return Bitmap.createBitmap(frozenBitmap, left, top, cropW, cropH);
+    }
+
+    private void saveBitmap(Bitmap bitmap) {
+        try {
+            String name = "JejakTeknisi_" + System.currentTimeMillis() + ".jpg";
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
+
+            Uri uri = getContentResolver().insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) {
+                status.setText("Gagal menyimpan foto");
+                return;
+            }
+
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 98, out)) {
+                    status.setText("Gagal menyimpan foto");
+                    return;
+                }
+            }
+            status.setText("Foto tersimpan • Jejak Teknisi");
+        } catch (Exception e) {
+            status.setText("Gagal menyimpan foto");
+            e.printStackTrace();
+        }
+    }
+
     private void toggleTorch() {
         if (camera == null) {
             status.setText("Kamera belum siap");
@@ -455,6 +646,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void takePhoto() {
+        if (frozen && frozenBitmap != null) {
+            Bitmap zoomed = getFrozenZoomedBitmap();
+            saveBitmap(zoomed != null ? zoomed : frozenBitmap);
+            return;
+        }
+
         if (capture == null) {
             status.setText("Kamera belum siap");
             return;
