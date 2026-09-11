@@ -793,15 +793,41 @@ public class MainActivity extends AppCompatActivity {
             canvas.restore();
         }
 
+        private float distancePointToSegment(float px,float py,float x1,float y1,float x2,float y2) {
+            float dx=x2-x1, dy=y2-y1;
+            if (dx==0f && dy==0f) return (float)Math.hypot(px-x1,py-y1);
+            float t=((px-x1)*dx+(py-y1)*dy)/(dx*dx+dy*dy);
+            t=Math.max(0f,Math.min(1f,t));
+            float qx=x1+t*dx, qy=y1+t*dy;
+            return (float)Math.hypot(px-qx,py-qy);
+        }
+
         private Annotation hitTest(float vx,float vy) {
             float[] p=viewToSource(vx,vy);
-            float tolerance=dp(24)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+            float tolerance=dp(28)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
             for (int i=items.size()-1;i>=0;i--) {
                 Annotation a=items.get(i);
-                float minX=Math.min(a.x1,a.x2)-tolerance, maxX=Math.max(a.x1,a.x2)+tolerance;
-                float minY=Math.min(a.y1,a.y2)-tolerance, maxY=Math.max(a.y1,a.y2)+tolerance;
-                if (a.type==AnnotationMode.MARKER || a.type==AnnotationMode.TEXT) { minX=a.x1-tolerance;maxX=a.x1+tolerance;minY=a.y1-tolerance;maxY=a.y1+tolerance; }
-                if (p[0]>=minX && p[0]<=maxX && p[1]>=minY && p[1]<=maxY) return a;
+                if (a.type==AnnotationMode.ARROW) {
+                    // Test against the actual rotated shaft.
+                    float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                    double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
+                    float rx=(float)(cx+(p[0]-cx)*cs-(p[1]-cy)*sn);
+                    float ry=(float)(cy+(p[0]-cx)*sn+(p[1]-cy)*cs);
+                    if (distancePointToSegment(rx,ry,a.x1,a.y1,a.x2,a.y2)<=tolerance) return a;
+                } else if (a.type==AnnotationMode.TEXT) {
+                    // Rotate the touch point back around the text anchor before hit testing.
+                    double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
+                    float dx=p[0]-a.x1, dy=p[1]-a.y1;
+                    float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
+                    float textW=paint.measureText(a.text==null?"":a.text);
+                    float textH=paint.getTextSize();
+                    if (rx>=-tolerance && rx<=textW+tolerance && ry>=-textH-tolerance && ry<=tolerance) return a;
+                } else {
+                    float minX=Math.min(a.x1,a.x2)-tolerance, maxX=Math.max(a.x1,a.x2)+tolerance;
+                    float minY=Math.min(a.y1,a.y2)-tolerance, maxY=Math.max(a.y1,a.y2)+tolerance;
+                    if (a.type==AnnotationMode.MARKER) { minX=a.x1-tolerance;maxX=a.x1+tolerance;minY=a.y1-tolerance;maxY=a.y1+tolerance; }
+                    if (p[0]>=minX && p[0]<=maxX && p[1]>=minY && p[1]<=maxY) return a;
+                }
             }
             return null;
         }
@@ -810,37 +836,58 @@ public class MainActivity extends AppCompatActivity {
             if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
             if (mode==AnnotationMode.SELECT) {
-                int action = e.getActionMasked();
-                if (action == MotionEvent.ACTION_DOWN) {
-                    selected=hitTest(x,y); lastSelectX=x; lastSelectY=y; rotatingSelected=false;
+                int action=e.getActionMasked();
+                if (action==MotionEvent.ACTION_DOWN) {
+                    selected=hitTest(x,y);
+                    lastSelectX=x; lastSelectY=y;
+                    rotatingSelected=false;
+                    lastRotateAngle=0f;
                     return true;
                 }
-                if (selected != null && e.getPointerCount() >= 2 &&
-                        (action == MotionEvent.ACTION_POINTER_DOWN || action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_POINTER_UP)) {
-                    if (e.getPointerCount() >= 2) {
+                if (selected!=null && e.getPointerCount()>=2 &&
+                        (action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_POINTER_UP)) {
+                    if (e.getPointerCount()>=2) {
                         float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
-                        float angle=(float)Math.toDegrees(Math.atan2(y1-y0, x1-x0));
-                        if (!rotatingSelected || action == MotionEvent.ACTION_POINTER_DOWN) {
-                            lastRotateAngle=angle; rotatingSelected=true;
+                        float angle=(float)Math.toDegrees(Math.atan2(y1-y0,x1-x0));
+                        if (!rotatingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
+                            lastRotateAngle=angle;
+                            rotatingSelected=true;
                         } else {
                             float delta=angle-lastRotateAngle;
-                            while(delta>180f) delta-=360f; while(delta<-180f) delta+=360f;
-                            selected.rotation += delta;
-                            lastRotateAngle=angle; invalidate();
+                            while(delta>180f) delta-=360f;
+                            while(delta<-180f) delta+=360f;
+                            selected.rotation+=delta;
+                            if(selected.rotation>360f) selected.rotation-=360f;
+                            if(selected.rotation<-360f) selected.rotation+=360f;
+                            lastRotateAngle=angle;
+                            invalidate();
                         }
+                    }
+                    // Prevent the first one-finger move after rotation from jumping.
+                    if(action==MotionEvent.ACTION_POINTER_UP) {
+                        rotatingSelected=false;
+                        lastSelectX=x; lastSelectY=y;
                     }
                     return true;
                 }
-                switch(action) {
-                    case MotionEvent.ACTION_MOVE:
-                        if (selected!=null && !rotatingSelected) { float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y); float dx=p2[0]-p1[0],dy=p2[1]-p1[1]; selected.x1+=dx;selected.y1+=dy;selected.x2+=dx;selected.y2+=dy; lastSelectX=x;lastSelectY=y;invalidate(); } return true;
-                    case MotionEvent.ACTION_POINTER_UP:
-                        rotatingSelected=false; return true;
-                    case MotionEvent.ACTION_UP: selected=null; rotatingSelected=false; return true;
+                if(action==MotionEvent.ACTION_MOVE && selected!=null && !rotatingSelected) {
+                    float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y);
+                    float dx=p2[0]-p1[0], dy=p2[1]-p1[1];
+                    selected.x1+=dx; selected.y1+=dy; selected.x2+=dx; selected.y2+=dy;
+                    lastSelectX=x; lastSelectY=y;
+                    invalidate();
+                    return true;
+                }
+                if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
+                    // Keep the object selected so it can be rotated/moved again without reselecting.
+                    rotatingSelected=false;
+                    lastSelectX=x; lastSelectY=y;
+                    invalidate();
+                    return true;
                 }
                 return true;
             }
-            if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
+        if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
             if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
             switch(e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: startX=x;startY=y;endX=x;endY=y;drawing=true;return true;
