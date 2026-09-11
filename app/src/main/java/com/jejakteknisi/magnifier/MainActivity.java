@@ -6,10 +6,7 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Matrix;
-import android.graphics.Paint;
 import android.hardware.camera2.CaptureRequest;
 import android.net.Uri;
 import android.os.Bundle;
@@ -40,35 +37,22 @@ import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
-
-import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
-
     private PreviewView preview;
+    private ImageView freezeView;
     private ImageCapture capture;
     private Camera camera;
-    private SeekBar zoomBar;
-    private SeekBar exposureBar;
-    private TextView zoomText;
-    private TextView exposureText;
-    private TextView status;
-    private TextView detailText;
-    private Button torchBtn;
-    private Button photoBtn;
-    private Button freezeBtn;
-    private ImageView freezeImage;
-
+    private SeekBar zoomBar, exposureBar;
+    private TextView zoomText, exposureText, status, detailBadge;
+    private Button torchBtn, photoBtn, freezeBtn;
     private boolean torch = false;
     private boolean frozen = false;
-    private boolean detailMode = true;
-    private int exposureIndex = 0;
+    private Bitmap frozenBitmap;
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
@@ -78,27 +62,20 @@ public class MainActivity extends AppCompatActivity {
         Button b = new Button(this);
         b.setText(text);
         b.setTextColor(Color.WHITE);
-        b.setTextSize(13);
+        b.setTextSize(12);
         b.setAllCaps(false);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(2), 0, dp(2), 0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+        b.setPadding(dp(1), 0, dp(1), 0);
         b.setBackgroundColor(Color.rgb(35, 40, 44));
         return b;
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
+    protected void onCreate(Bundle state) {
+        super.onCreate(state);
         buildUi();
-
-        View rootView = findViewById(android.R.id.content);
-        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, insets) -> {
-            androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            return insets;
-        });
-        ViewCompat.requestApplyInsets(rootView);
-
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this,
@@ -113,82 +90,78 @@ public class MainActivity extends AppCompatActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.BLACK);
 
+        // Compact branded header.
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(8), dp(3), dp(8), dp(3));
+        top.setPadding(dp(8), dp(2), dp(8), dp(2));
         top.setBackgroundColor(Color.rgb(18, 20, 22));
 
-        ImageView logoView = new ImageView(this);
-        logoView.setImageResource(R.drawable.jejak_teknisi_logo);
-        logoView.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        logoView.setContentDescription("Logo Jejak Teknisi");
-        top.addView(logoView, new LinearLayout.LayoutParams(dp(52), dp(52)));
+        ImageView logo = new ImageView(this);
+        logo.setImageResource(R.drawable.jejak_teknisi_logo);
+        logo.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        top.addView(logo, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.1");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(17);
-        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setTextSize(18);
         title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setPadding(dp(10), 0, 0, 0);
-        top.addView(title, new LinearLayout.LayoutParams(0, dp(58), 1));
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setPadding(dp(9), 0, 0, 0);
+        top.addView(title, new LinearLayout.LayoutParams(0, dp(52), 1));
 
-        Button detailBtn = makeButton("DETAIL\nON");
-        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(52)));
+        Button detail = makeButton("DETAIL\nON");
+        detail.setTextSize(12);
+        top.addView(detail, new LinearLayout.LayoutParams(dp(82), dp(48)));
         root.addView(top);
 
+        // Camera preview takes the largest possible area.
         FrameLayout cameraBox = new FrameLayout(this);
         preview = new PreviewView(this);
         preview.setScaleType(PreviewView.ScaleType.FILL_CENTER);
         cameraBox.addView(preview, new FrameLayout.LayoutParams(-1, -1));
 
-        freezeImage = new ImageView(this);
-        freezeImage.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        freezeImage.setBackgroundColor(Color.BLACK);
-        freezeImage.setVisibility(View.GONE);
-        cameraBox.addView(freezeImage, new FrameLayout.LayoutParams(-1, -1));
+        freezeView = new ImageView(this);
+        freezeView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        freezeView.setVisibility(View.GONE);
+        cameraBox.addView(freezeView, new FrameLayout.LayoutParams(-1, -1));
 
-        status = new TextView(this);
-        status.setText("Menyiapkan kamera...");
-        status.setTextColor(Color.WHITE);
-        status.setTextSize(12);
-        status.setBackgroundColor(Color.argb(160, 0, 0, 0));
-        status.setPadding(dp(8), dp(5), dp(8), dp(5));
-        FrameLayout.LayoutParams statusParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.START);
-        statusParams.setMargins(dp(8), dp(8), 0, 0);
-        cameraBox.addView(status, statusParams);
+        detailBadge = overlay("DETAIL • HIGH QUALITY");
+        FrameLayout.LayoutParams badgeLp = new FrameLayout.LayoutParams(-2, -2,
+                Gravity.TOP | Gravity.END);
+        badgeLp.setMargins(0, dp(7), dp(7), 0);
+        cameraBox.addView(detailBadge, badgeLp);
 
-        detailText = new TextView(this);
-        detailText.setText("DETAIL • EDGE HIGH QUALITY");
-        detailText.setTextColor(Color.WHITE);
-        detailText.setTextSize(11);
-        detailText.setBackgroundColor(Color.argb(150, 0, 0, 0));
-        detailText.setPadding(dp(7), dp(4), dp(7), dp(4));
-        FrameLayout.LayoutParams detailParams = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
-        detailParams.setMargins(0, dp(8), dp(8), 0);
-        cameraBox.addView(detailText, detailParams);
+        status = overlay("Menyiapkan kamera...");
+        FrameLayout.LayoutParams statusLp = new FrameLayout.LayoutParams(-2, -2,
+                Gravity.TOP | Gravity.START);
+        statusLp.setMargins(dp(7), dp(7), 0, 0);
+        cameraBox.addView(status, statusLp);
 
         root.addView(cameraBox, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        zoomText = label("Zoom 1.0×", 14);
-        root.addView(zoomText, new LinearLayout.LayoutParams(-1, dp(26)));
+        // Compact zoom section.
+        zoomText = compactText("Zoom 1.0×");
+        root.addView(zoomText, new LinearLayout.LayoutParams(-1, dp(25)));
         zoomBar = new SeekBar(this);
         zoomBar.setMax(100);
-        zoomBar.setProgress(0);
-        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(38)));
+        zoomBar.setPadding(dp(18), 0, dp(18), 0);
+        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(32)));
 
-        exposureText = label("Exposure 0", 13);
+        // Compact exposure section.
+        exposureText = compactText("Exposure 0");
         root.addView(exposureText, new LinearLayout.LayoutParams(-1, dp(24)));
         exposureBar = new SeekBar(this);
         exposureBar.setMax(12);
         exposureBar.setProgress(6);
-        root.addView(exposureBar, new LinearLayout.LayoutParams(-1, dp(34)));
+        exposureBar.setPadding(dp(18), 0, dp(18), 0);
+        root.addView(exposureBar, new LinearLayout.LayoutParams(-1, dp(31)));
 
         LinearLayout controls = new LinearLayout(this);
         controls.setOrientation(LinearLayout.HORIZONTAL);
         controls.setGravity(Gravity.CENTER);
-        controls.setPadding(dp(4), dp(3), dp(4), dp(6));
+        controls.setPadding(dp(4), dp(3), dp(4), dp(3));
         controls.setBackgroundColor(Color.rgb(10, 12, 14));
 
         Button minus = makeButton("−");
@@ -198,105 +171,103 @@ public class MainActivity extends AppCompatActivity {
         Button focus = makeButton("🎯\nFokus");
         Button plus = makeButton("+");
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(60), .65f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(60), 1.0f));
-        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(60), 1.0f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(68), 1.45f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(60), 1.0f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(60), .65f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(58), .62f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(58), 1.0f));
+        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(58), 1.0f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(62), 1.35f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(58), 1.0f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(58), .62f));
+        root.addView(controls, new LinearLayout.LayoutParams(-1, dp(64)));
 
-        LinearLayout.LayoutParams controlParams = new LinearLayout.LayoutParams(-1, -2);
-        controlParams.setMargins(0, 0, 0, dp(28));
-        root.addView(controls, controlParams);
         setContentView(root);
 
-        detailBtn.setOnClickListener(v -> {
-            detailMode = !detailMode;
-            detailBtn.setText(detailMode ? "DETAIL\nON" : "DETAIL\nOFF");
-            detailText.setText(detailMode ? "DETAIL • EDGE HIGH QUALITY" : "NORMAL MODE");
-            status.setText(detailMode ? "Mode detail aktif" : "Mode normal aktif");
-        });
-
         zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
-                if (fromUser) setZoomFromProgress(p);
+            public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+                if (fromUser) setZoom(p);
             }
-            @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {}
+            public void onStartTrackingTouch(SeekBar s) {}
+            public void onStopTrackingTouch(SeekBar s) {}
         });
 
         exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
-                exposureIndex = p - 6;
-                exposureText.setText("Exposure " + (exposureIndex >= 0 ? "+" : "") + exposureIndex);
-                if (fromUser) applyExposure();
+            public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+                if (fromUser) setExposure(p - 6);
             }
-            @Override public void onStartTrackingTouch(SeekBar s) {}
-            @Override public void onStopTrackingTouch(SeekBar s) {}
+            public void onStartTrackingTouch(SeekBar s) {}
+            public void onStopTrackingTouch(SeekBar s) {}
         });
 
-        minus.setOnClickListener(v -> changeZoom(-0.5f));
-        plus.setOnClickListener(v -> changeZoom(0.5f));
+        minus.setOnClickListener(v -> stepZoom(-0.5f));
+        plus.setOnClickListener(v -> stepZoom(0.5f));
         torchBtn.setOnClickListener(v -> toggleTorch());
         freezeBtn.setOnClickListener(v -> toggleFreeze());
-        focus.setOnClickListener(v -> {
-            if (!frozen && preview != null) focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f);
-        });
+        focus.setOnClickListener(v -> focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f));
         photoBtn.setOnClickListener(v -> takePhoto());
 
-        preview.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP && !frozen) {
-                focusAt(event.getX(), event.getY());
+        preview.setOnTouchListener((v, e) -> {
+            if (e.getAction() == MotionEvent.ACTION_UP && !frozen) {
+                focusAt(e.getX(), e.getY());
             }
             return true;
         });
     }
 
-    private TextView label(String text, int size) {
+    private TextView compactText(String text) {
         TextView t = new TextView(this);
         t.setText(text);
         t.setTextColor(Color.WHITE);
-        t.setTextSize(size);
+        t.setTextSize(13);
         t.setGravity(Gravity.CENTER);
+        t.setBackgroundColor(Color.BLACK);
+        return t;
+    }
+
+    private TextView overlay(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(11);
+        t.setPadding(dp(7), dp(4), dp(7), dp(4));
+        t.setBackgroundColor(Color.argb(125, 0, 0, 0));
         return t;
     }
 
     private void startCamera() {
         status.setText("Menyiapkan kamera...");
-        final ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
+        ListenableFuture<ProcessCameraProvider> future =
+                ProcessCameraProvider.getInstance(this);
 
         future.addListener(() -> {
             try {
                 ProcessCameraProvider provider = future.get();
-
                 ResolutionSelector highest = new ResolutionSelector.Builder()
                         .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
                         .build();
 
-                Preview.Builder previewBuilder = new Preview.Builder()
+                int rotation = preview.getDisplay() == null ? 0 : preview.getDisplay().getRotation();
+                Preview.Builder pb = new Preview.Builder()
                         .setResolutionSelector(highest)
-                        .setTargetRotation(preview.getDisplay().getRotation());
+                        .setTargetRotation(rotation);
+                Camera2Interop.Extender<Preview> pi = new Camera2Interop.Extender<>(pb);
+                setHighQuality(pi);
+                Preview previewUseCase = pb.build();
 
-                Camera2Interop.Extender<Preview> previewInterop = new Camera2Interop.Extender<>(previewBuilder);
-                applyCameraQuality(previewInterop);
-                Preview previewUseCase = previewBuilder.build();
-
-                ImageCapture.Builder captureBuilder = new ImageCapture.Builder()
+                ImageCapture.Builder cb = new ImageCapture.Builder()
                         .setResolutionSelector(highest)
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setJpegQuality(100)
-                        .setTargetRotation(preview.getDisplay().getRotation());
-
-                Camera2Interop.Extender<ImageCapture> captureInterop = new Camera2Interop.Extender<>(captureBuilder);
-                applyCameraQuality(captureInterop);
-                capture = captureBuilder.build();
+                        .setTargetRotation(rotation);
+                Camera2Interop.Extender<ImageCapture> ci = new Camera2Interop.Extender<>(cb);
+                setHighQuality(ci);
+                capture = cb.build();
 
                 provider.unbindAll();
-                camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, previewUseCase, capture);
+                camera = provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA,
+                        previewUseCase, capture);
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
-                applyExposure();
-                status.setText("Kamera siap • tap untuk fokus");
+                setExposure(0);
+                status.setText("Kamera siap • tap PCB untuk fokus");
             } catch (Exception e) {
                 status.setText("Kamera gagal");
                 e.printStackTrace();
@@ -304,59 +275,56 @@ public class MainActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
-    private <T> void applyCameraQuality(Camera2Interop.Extender<T> interop) {
-        interop.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE,
+    private <T> void setHighQuality(Camera2Interop.Extender<T> ext) {
+        ext.setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE,
                 CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-        interop.setCaptureRequestOption(CaptureRequest.EDGE_MODE,
-                detailMode ? CaptureRequest.EDGE_MODE_HIGH_QUALITY : CaptureRequest.EDGE_MODE_FAST);
-        interop.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE,
+        ext.setCaptureRequestOption(CaptureRequest.EDGE_MODE,
+                CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+        ext.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE,
                 CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
-        interop.setCaptureRequestOption(CaptureRequest.SHADING_MODE,
+        ext.setCaptureRequestOption(CaptureRequest.SHADING_MODE,
                 CaptureRequest.SHADING_MODE_HIGH_QUALITY);
     }
 
     private void updateZoomText() {
         if (camera == null || camera.getCameraInfo().getZoomState().getValue() == null) return;
-        float current = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
+        float z = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
         float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
-        zoomText.setText(String.format(Locale.US, "Zoom %.1f×  (maks %.1f×)", current, max));
+        zoomText.setText(String.format("Zoom %.1f×  •  maks %.1f×", z, max));
     }
 
-    private void setZoomFromProgress(int progress) {
+    private void setZoom(int progress) {
         if (camera == null || camera.getCameraInfo().getZoomState().getValue() == null) return;
         float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
-        if (max <= 1f) return;
         float ratio = 1f + (max - 1f) * progress / 100f;
         camera.getCameraControl().setZoomRatio(ratio);
         updateZoomText();
     }
 
-    private void changeZoom(float delta) {
+    private void stepZoom(float delta) {
         if (camera == null || camera.getCameraInfo().getZoomState().getValue() == null) return;
-        float current = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
+        float z = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
         float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
-        float newZoom = Math.max(1f, Math.min(max, current + delta));
-        camera.getCameraControl().setZoomRatio(newZoom);
-        if (max > 1f) zoomBar.setProgress((int) ((newZoom - 1f) / (max - 1f) * 100f));
+        z = Math.max(1f, Math.min(max, z + delta));
+        camera.getCameraControl().setZoomRatio(z);
+        zoomBar.setProgress(max <= 1f ? 0 : (int) ((z - 1f) / (max - 1f) * 100f));
         updateZoomText();
     }
 
-    private void applyExposure() {
+    private void setExposure(int index) {
         if (camera == null) return;
-        try {
-            camera.getCameraControl().setExposureCompensationIndex(exposureIndex);
-        } catch (Exception ignored) {
-            status.setText("Exposure tidak didukung kamera ini");
-        }
+        int min = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
+        int max = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getUpper();
+        int safe = Math.max(min, Math.min(max, index));
+        camera.getCameraControl().setExposureCompensationIndex(safe);
+        exposureText.setText("Exposure " + (safe > 0 ? "+" + safe : safe));
+        int progress = Math.max(0, Math.min(12, safe + 6));
+        if (exposureBar.getProgress() != progress) exposureBar.setProgress(progress);
     }
 
     private void toggleTorch() {
-        if (camera == null) {
-            status.setText("Kamera belum siap");
-            return;
-        }
-        if (!camera.getCameraInfo().hasFlashUnit()) {
-            status.setText("Flash tidak tersedia");
+        if (camera == null || !camera.getCameraInfo().hasFlashUnit()) {
+            status.setText("Lampu flash tidak tersedia");
             return;
         }
         torch = !torch;
@@ -365,10 +333,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void focusAt(float x, float y) {
-        if (camera == null) return;
+        if (camera == null || frozen) return;
         MeteringPoint point = preview.getMeteringPointFactory().createPoint(x, y);
-        FocusMeteringAction action = new FocusMeteringAction.Builder(
-                point, FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE).build();
+        FocusMeteringAction action = new FocusMeteringAction.Builder(point,
+                FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE).build();
         camera.getCameraControl().startFocusAndMetering(action);
         status.setText("Fokus...");
     }
@@ -376,26 +344,36 @@ public class MainActivity extends AppCompatActivity {
     private void toggleFreeze() {
         if (preview == null) return;
         if (!frozen) {
-            Bitmap frame = preview.getBitmap();
-            if (frame == null) {
+            Bitmap bmp = preview.getBitmap();
+            if (bmp == null) {
                 status.setText("Frame belum siap");
                 return;
             }
-            freezeImage.setImageBitmap(frame);
-            freezeImage.setVisibility(View.VISIBLE);
+            frozenBitmap = bmp;
+            freezeView.setImageBitmap(bmp);
+            freezeView.setVisibility(View.VISIBLE);
+            preview.setVisibility(View.INVISIBLE);
             frozen = true;
             freezeBtn.setText("▶\nLIVE");
-            status.setText("FREEZE • tekan LIVE untuk kembali");
+            status.setText("FRAME BEKU • tekan LIVE untuk kembali");
         } else {
-            freezeImage.setImageDrawable(null);
-            freezeImage.setVisibility(View.GONE);
+            freezeView.setVisibility(View.GONE);
+            preview.setVisibility(View.VISIBLE);
             frozen = false;
             freezeBtn.setText("❄\nBeku");
-            status.setText("LIVE • tap untuk fokus");
+            status.setText("LIVE • tap PCB untuk fokus");
+            if (frozenBitmap != null) {
+                frozenBitmap.recycle();
+                frozenBitmap = null;
+            }
         }
     }
 
     private void takePhoto() {
+        if (frozen && frozenBitmap != null) {
+            saveBitmap(frozenBitmap);
+            return;
+        }
         if (capture == null) {
             status.setText("Kamera belum siap");
             return;
@@ -405,50 +383,60 @@ public class MainActivity extends AppCompatActivity {
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.DISPLAY_NAME,
-                "JejakTeknisi_Microscope_" + System.currentTimeMillis() + ".jpg");
+                "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
         values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-        values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
+        values.put(MediaStore.Images.Media.RELATIVE_PATH,
+                "Pictures/JejakTeknisi/Microscope");
 
         ImageCapture.OutputFileOptions output = new ImageCapture.OutputFileOptions.Builder(
                 getContentResolver(), MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values).build();
-
         capture.takePicture(output, ContextCompat.getMainExecutor(this),
                 new ImageCapture.OnImageSavedCallback() {
-                    @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults result) {
+                    @Override
+                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults result) {
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
-                        status.setText("Foto tersimpan • kualitas maksimum");
+                        status.setText("Foto tersimpan");
                         showPhotoOptions(result.getSavedUri());
                     }
-
-                    @Override public void onError(@NonNull ImageCaptureException error) {
+                    @Override
+                    public void onError(@NonNull ImageCaptureException error) {
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
-                        status.setText("Foto gagal: " + error.getImageCaptureError());
+                        status.setText("Foto gagal");
                     }
                 });
+    }
+
+    private void saveBitmap(Bitmap bitmap) {
+        try {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME,
+                    "JejakTeknisi_Freeze_" + System.currentTimeMillis() + ".jpg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH,
+                    "Pictures/JejakTeknisi/Microscope");
+            Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) throw new Exception("URI null");
+            java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+            if (out == null) throw new Exception("Output null");
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            out.close();
+            status.setText("Frame beku tersimpan");
+            showPhotoOptions(uri);
+        } catch (Exception e) {
+            status.setText("Gagal menyimpan frame");
+        }
     }
 
     private void showPhotoOptions(Uri uri) {
         if (uri == null) return;
         new AlertDialog.Builder(this)
-                .setTitle("Foto berhasil disimpan")
+                .setTitle("Foto tersimpan")
                 .setMessage("Pictures/JejakTeknisi/Microscope")
-                .setPositiveButton("🔎 Google Lens", (dialog, which) -> sendToGoogleLens(uri))
-                .setNeutralButton("🖼 Lihat", (dialog, which) -> openImage(uri))
+                .setPositiveButton("🔎 Google Lens", (d, w) -> sendToGoogleLens(uri))
                 .setNegativeButton("Tutup", null)
                 .show();
-    }
-
-    private void openImage(Uri uri) {
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-            intent.setDataAndType(uri, "image/jpeg");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(intent);
-        } catch (Exception e) {
-            status.setText("Tidak ada aplikasi galeri");
-        }
     }
 
     private void sendToGoogleLens(Uri uri) {
@@ -482,6 +470,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         try {
             if (camera != null) camera.getCameraControl().enableTorch(false);
+            if (frozenBitmap != null && !frozenBitmap.isRecycled()) frozenBitmap.recycle();
         } catch (Exception ignored) {}
         super.onDestroy();
     }
