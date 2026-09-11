@@ -563,6 +563,7 @@ public class MainActivity extends AppCompatActivity {
         annotationView = new AnnotationView(this);
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
         cameraBox.addView(annotationView, overlayParams);
+        annotationView.bringToFront();
         annotationView.setMode(annotationMode);
 
         int exposureIndex = rootLayout.indexOfChild(exposureRow);
@@ -990,6 +991,8 @@ public class MainActivity extends AppCompatActivity {
 
         AnnotationView(Context context) {
             super(context);
+            setClickable(true);
+            setFocusable(true);
             setBackground(new ColorDrawable(Color.TRANSPARENT));
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             annotationScaleDetector = new ScaleGestureDetector(MainActivity.this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -1238,8 +1241,42 @@ public class MainActivity extends AppCompatActivity {
             float x=e.getX(), y=e.getY();
             if (mode==AnnotationMode.JUMPER) {
                 annotationScaleDetector.onTouchEvent(e);
+                int action = e.getActionMasked();
+                // One finger = draw jumper. Two fingers = zoom the frozen PCB image.
                 if (e.getPointerCount() >= 2 || annotationScaleDetector.isInProgress()) {
                     drawing = false;
+                    return true;
+                }
+                if (action == MotionEvent.ACTION_DOWN) {
+                    float[] q = clampToImageView(x, y);
+                    startX=q[0]; startY=q[1]; endX=q[0]; endY=q[1];
+                    drawing=true;
+                    selected=null;
+                    invalidate();
+                    return true;
+                }
+                if (action == MotionEvent.ACTION_MOVE && drawing) {
+                    float[] q = clampToImageView(x, y);
+                    endX=q[0]; endY=q[1];
+                    invalidate();
+                    return true;
+                }
+                if (action == MotionEvent.ACTION_UP && drawing) {
+                    float[] q=clampToImageView(x,y);
+                    endX=q[0]; endY=q[1];
+                    float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
+                    float minLen = dp(12)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                    if (Math.hypot(b[0]-a[0],b[1]-a[1]) >= minLen) {
+                        pushUndo();
+                        Annotation created=Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],currentColor,strokeDp);
+                        items.add(created);
+                        selected=created;
+                        status.setText("Jumper " + items.size() + " dibuat • Pilih untuk edit");
+                    } else {
+                        status.setText("Tarik Jumper lebih panjang: A → B");
+                    }
+                    drawing=false;
+                    invalidate();
                     return true;
                 }
             }
