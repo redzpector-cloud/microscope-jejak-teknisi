@@ -91,6 +91,10 @@ public class MainActivity extends AppCompatActivity {
     private boolean detailOn = true;
     private LinearLayout topBar;
     private LinearLayout controlsBar;
+    private LinearLayout rootLayout;
+    private LinearLayout infoRow;
+    private LinearLayout exposureRow;
+    private LinearLayout detailRow;
     private boolean torch = false;
 
     // V2.5 PCB inspection / annotation
@@ -152,6 +156,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void buildUi() {
         LinearLayout root = new LinearLayout(this);
+        rootLayout = root;
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.BLACK);
 
@@ -225,7 +230,7 @@ public class MainActivity extends AppCompatActivity {
                 new LinearLayout.LayoutParams(-1, 0, 1)
         );
 
-        LinearLayout infoRow = new LinearLayout(this);
+        infoRow = new LinearLayout(this);
         infoRow.setOrientation(LinearLayout.HORIZONTAL);
         infoRow.setGravity(Gravity.CENTER_VERTICAL);
         infoRow.setPadding(dp(8), 0, dp(8), 0);
@@ -242,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
         zoomBar.setProgress(0);
         root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(38)));
 
-        LinearLayout exposureRow = new LinearLayout(this);
+        exposureRow = new LinearLayout(this);
         exposureRow.setOrientation(LinearLayout.HORIZONTAL);
         exposureRow.setGravity(Gravity.CENTER_VERTICAL);
         exposureRow.setPadding(dp(8), 0, dp(8), 0);
@@ -255,7 +260,7 @@ public class MainActivity extends AppCompatActivity {
         exposureRow.addView(autoExposureBtn, new LinearLayout.LayoutParams(dp(68), dp(40)));
         root.addView(exposureRow, new LinearLayout.LayoutParams(-1, dp(44)));
 
-        LinearLayout detailRow = new LinearLayout(this);
+        detailRow = new LinearLayout(this);
         detailRow.setOrientation(LinearLayout.HORIZONTAL);
         detailRow.setGravity(Gravity.CENTER_VERTICAL);
         detailRow.setPadding(dp(8), 0, dp(8), 0);
@@ -422,12 +427,12 @@ public class MainActivity extends AppCompatActivity {
         Button[] row1 = {pan, select, marker, arrow, circle, text};
         for (Button b : row1) {
             b.setTextSize(10);
-            toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(46), 1f));
+            toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
         }
         Button[] row2 = {ocr, undo, clear, save, share};
         for (Button b : row2) {
             b.setTextSize(10);
-            toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(42), 1f));
+            toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
         }
 
         Button red = makeButton("●");
@@ -441,12 +446,12 @@ public class MainActivity extends AppCompatActivity {
         legend.setTextSize(10);
 
         Button[] opts = {red, yellow, green, blue, small, medium, large};
-        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(32), 1.7f));
-        for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(32), .55f));
+        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.7f));
+        for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(22), .55f));
 
-        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(48)));
-        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(44)));
-        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(34)));
+        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(40)));
+        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(30)));
+        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
 
         pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
         marker.setOnClickListener(v -> setAnnotationMode(AnnotationMode.MARKER, "Marker aktif • tap titik komponen"));
@@ -469,14 +474,20 @@ public class MainActivity extends AppCompatActivity {
         medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
 
-        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(-1, dp(130), Gravity.BOTTOM);
-        barParams.bottomMargin = dp(2);
+        // In Freeze mode the editing toolbar moves into the former Exposure area.
+        // Zoom and Detail controls are hidden so the microscope preview becomes taller.
         annotationView = new AnnotationView(this);
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
-        cameraBox.addView(annotationView, cameraBox.indexOfChild(freezeView) + 1, overlayParams);
+        cameraBox.addView(annotationView, overlayParams);
         annotationView.setMode(annotationMode);
-        cameraBox.addView(annotationBar, barParams);
-        annotationBar.bringToFront();
+
+        int exposureIndex = rootLayout.indexOfChild(exposureRow);
+        exposureRow.setVisibility(View.GONE);
+        zoomBar.setVisibility(View.GONE);
+        detailRow.setVisibility(View.GONE);
+
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(92));
+        rootLayout.addView(annotationBar, exposureIndex, barParams);
     }
 
     private void detectOcrOnFrozenImage() {
@@ -560,13 +571,16 @@ public class MainActivity extends AppCompatActivity {
     private void hideAnnotationTools() {
         annotationMode = AnnotationMode.NONE;
         if (annotationBar != null) {
-            cameraBox.removeView(annotationBar);
+            rootLayout.removeView(annotationBar);
             annotationBar = null;
         }
         if (annotationView != null) {
             cameraBox.removeView(annotationView);
             annotationView = null;
         }
+        if (zoomBar != null) zoomBar.setVisibility(View.VISIBLE);
+        if (exposureRow != null) exposureRow.setVisibility(View.VISIBLE);
+        if (detailRow != null) detailRow.setVisibility(View.VISIBLE);
     }
 
     private void saveAnnotatedFreeze() {
