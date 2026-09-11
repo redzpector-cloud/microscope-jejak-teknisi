@@ -31,11 +31,6 @@ import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
-import android.content.ActivityNotFoundException;
-import android.os.Build;
-import java.io.File;
-import java.io.FileOutputStream;
-import androidx.core.content.FileProvider;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -67,8 +62,6 @@ import androidx.core.view.WindowInsetsCompat;
 public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
-    private static final int MAX_FREEZE_DIMENSION = 4096;
-    private static final int OCR_MAX_DIMENSION = 2048;
 
     private PreviewView preview;
     private ImageCapture capture;
@@ -109,8 +102,6 @@ public class MainActivity extends AppCompatActivity {
     private Button overlayBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
-    private int exposureLower = -4;
-    private int exposureUpper = 4;
 
     // V3.0 Crosshair + Grid overlay
     private OverlayView overlayView;
@@ -265,12 +256,10 @@ public class MainActivity extends AppCompatActivity {
         infoRow.setBackgroundColor(Color.BLACK);
 
         zoomText = makeInfoText("Zoom 1.0×");
-        zoomText.setTextSize(18);
         exposureText = makeInfoText("Exposure 0 • NORMAL");
-        exposureText.setTextSize(14);
-        infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(58), 1));
+        infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(30), 1));
         infoRow.addView(exposureText, new LinearLayout.LayoutParams(0, dp(30), 1));
-        root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(48)));
+        root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(30)));
 
         zoomBar = new SeekBar(this);
         zoomBar.setMax(100);
@@ -282,8 +271,8 @@ public class MainActivity extends AppCompatActivity {
         exposureRow.setGravity(Gravity.CENTER_VERTICAL);
         exposureRow.setPadding(dp(8), 0, dp(8), 0);
         exposureBar = new SeekBar(this);
-        exposureBar.setMax(100);
-        exposureBar.setProgress(50);
+        exposureBar.setMax(8);
+        exposureBar.setProgress(4);
         exposureRow.addView(exposureBar, new LinearLayout.LayoutParams(0, dp(40), 1));
         autoExposureBtn = makeButton("AUTO");
         autoExposureBtn.setTextSize(12);
@@ -357,7 +346,7 @@ public class MainActivity extends AppCompatActivity {
 
         exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) setExposureFromProgress(progress);
+                if (fromUser) setExposure(progress - 4);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -540,7 +529,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Bekukan gambar dulu");
             return;
         }
-        Bitmap cropBitmap = getFrozenZoomedBitmap(OCR_MAX_DIMENSION);
+        Bitmap cropBitmap = getFrozenZoomedBitmap();
         CropInfo crop = getCurrentCropInfo();
         if (cropBitmap == null || crop == null) {
             status.setText("Area gambar belum siap");
@@ -641,15 +630,11 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        try {
-            if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
-        } finally {
-            if (!result.isRecycled()) result.recycle();
-        }
+        if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
     }
 
     private Bitmap buildAnnotatedBitmap() {
-        Bitmap base = getFrozenZoomedBitmap(MAX_FREEZE_DIMENSION);
+        Bitmap base = getFrozenZoomedBitmap();
         if (base == null) return null;
         Bitmap result = base.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(result);
@@ -736,12 +721,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         Bitmap result = buildAnnotatedBitmap();
-        Uri uri = null;
-        try {
-            uri = result == null ? null : saveBitmapToGallery(result);
-        } finally {
-            if (result != null && !result.isRecycled()) result.recycle();
-        }
+        Uri uri = result == null ? null : saveBitmapToGallery(result);
         if (uri == null) return;
         Intent intent = new Intent(Intent.ACTION_SEND);
         intent.setType("image/jpeg");
@@ -1158,14 +1138,8 @@ public class MainActivity extends AppCompatActivity {
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
                         .setJpegQuality(98);
                 Camera2Interop.Extender<ImageCapture> extender = new Camera2Interop.Extender<>(captureBuilder);
-                // Optional Camera2 tuning. Some devices reject these keys, so a failure
-                // must never prevent the normal CameraX capture pipeline from starting.
-                try {
-                    extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY);
-                    extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
-                } catch (RuntimeException ignored) {
-                    // Keep the default CameraX settings for incompatible devices.
-                }
+                extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+                extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
                 capture = captureBuilder.build();
 
                 provider.unbindAll();
@@ -1231,22 +1205,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void setExposure(int value) {
         if (camera == null) return;
-        androidx.camera.core.ExposureState state = camera.getCameraInfo().getExposureState();
-        exposureLower = state.getExposureCompensationRange().getLower();
-        exposureUpper = state.getExposureCompensationRange().getUpper();
-        int span = Math.max(1, exposureUpper - exposureLower);
-        int clamped = Math.max(exposureLower, Math.min(exposureUpper, value));
+        int range = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getUpper();
+        int lower = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
+        int clamped = Math.max(lower, Math.min(range, value));
         camera.getCameraControl().setExposureCompensationIndex(clamped);
-        int progress = Math.round((clamped - exposureLower) * 100f / span);
-        exposureBar.setProgress(Math.max(0, Math.min(100, progress)));
+        exposureBar.setProgress(clamped + 4);
         exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
-    }
-
-    private void setExposureFromProgress(int progress) {
-        if (camera == null) return;
-        int span = Math.max(1, exposureUpper - exposureLower);
-        int value = exposureLower + Math.round(span * (progress / 100f));
-        setExposure(value);
     }
 
     private void setFreezeFullscreen(boolean freezeMode) {
@@ -1290,11 +1254,7 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            frozenBitmap = prepareFreezeBitmap(bitmap);
-            if (frozenBitmap == null) {
-                status.setText("Gagal menyiapkan gambar beku");
-                return;
-            }
+            frozenBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
             freezeView = new ImageView(this);
             freezeView.setImageBitmap(frozenBitmap);
             freezeView.setScaleType(ImageView.ScaleType.MATRIX);
@@ -1323,7 +1283,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("❄️ BEKU • pilih alat untuk menandai PCB");
         } else {
             hideAnnotationTools();
-            releaseFrozenBitmap();
+            frozenBitmap = null;
             if (freezeView != null) {
                 ViewParent parent = freezeView.getParent();
                 if (parent instanceof FrameLayout) {
@@ -1387,59 +1347,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap getFrozenZoomedBitmap() {
-        return getFrozenZoomedBitmap(MAX_FREEZE_DIMENSION);
-    }
-
-    private Bitmap getFrozenZoomedBitmap(int maxDimension) {
         CropInfo crop = getCurrentCropInfo();
-        if (crop == null || frozenBitmap == null || frozenBitmap.isRecycled()) return null;
-        try {
-            Bitmap source = frozenBitmap;
-            int left = crop.left, top = crop.top, width = crop.width, height = crop.height;
-            float scale = Math.min(1f, maxDimension / (float) Math.max(width, height));
-            if (scale < 1f) {
-                width = Math.max(1, Math.round(width * scale));
-                height = Math.max(1, Math.round(height * scale));
-                Bitmap scaled = Bitmap.createBitmap(source, left, top, crop.width, crop.height);
-                Bitmap result = Bitmap.createScaledBitmap(scaled, width, height, true);
-                if (scaled != result && !scaled.isRecycled()) scaled.recycle();
-                return result;
-            }
-            return Bitmap.createBitmap(source, left, top, width, height);
-        } catch (OutOfMemoryError e) {
-            status.setText("Gambar terlalu besar untuk memori HP");
-            return null;
-        } catch (RuntimeException e) {
-            status.setText("Gagal memproses gambar");
-            return null;
-        }
-    }
-
-    private Bitmap prepareFreezeBitmap(Bitmap source) {
-        if (source == null || source.isRecycled()) return null;
-        try {
-            int w = source.getWidth(), h = source.getHeight();
-            float scale = Math.min(1f, MAX_FREEZE_DIMENSION / (float) Math.max(w, h));
-            int nw = Math.max(1, Math.round(w * scale));
-            int nh = Math.max(1, Math.round(h * scale));
-            if (nw == w && nh == h) {
-                return source.copy(Bitmap.Config.ARGB_8888, false);
-            }
-            return Bitmap.createScaledBitmap(source, nw, nh, true);
-        } catch (OutOfMemoryError e) {
-            status.setText("RAM tidak cukup untuk Freeze");
-            return null;
-        } catch (RuntimeException e) {
-            status.setText("Gagal menyiapkan Freeze");
-            return null;
-        }
-    }
-
-    private void releaseFrozenBitmap() {
-        if (frozenBitmap != null && !frozenBitmap.isRecycled()) {
-            frozenBitmap.recycle();
-        }
-        frozenBitmap = null;
+        if (crop == null) return null;
+        return Bitmap.createBitmap(frozenBitmap, crop.left, crop.top, crop.width, crop.height);
     }
 
     private void saveBitmap(Bitmap bitmap) {
@@ -1458,10 +1368,8 @@ public class MainActivity extends AppCompatActivity {
             Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
             if (uri == null) { status.setText("Gagal menyimpan foto"); return null; }
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
-                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) {
-                    getContentResolver().delete(uri, null, null);
-                    status.setText("Gagal menyimpan foto");
-                    return null;
+                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 98, out)) {
+                    status.setText("Gagal menyimpan foto"); return null;
                 }
             }
             return uri;
@@ -1509,14 +1417,7 @@ public class MainActivity extends AppCompatActivity {
     private void takePhoto() {
         if (frozen && frozenBitmap != null) {
             Bitmap zoomed = getFrozenZoomedBitmap();
-            Uri uri = null;
-            try {
-                uri = zoomed != null ? saveBitmapToCache(zoomed) : saveBitmapToCache(frozenBitmap);
-            } finally {
-                if (zoomed != null && !zoomed.isRecycled()) zoomed.recycle();
-            }
-            status.setText("Foto siap • belum disimpan ke Galeri");
-            showPhotoOptions(uri);
+            saveBitmap(zoomed != null ? zoomed : frozenBitmap);
             return;
         }
 
@@ -1528,223 +1429,72 @@ public class MainActivity extends AppCompatActivity {
         photoBtn.setEnabled(false);
         photoBtn.setText("📸\nMEMOTRET...");
 
-        File photoDir = new File(getCacheDir(), "photos");
-        if (!photoDir.exists() && !photoDir.mkdirs()) {
-            photoBtn.setEnabled(true);
-            photoBtn.setText("📸\nFOTO");
-            status.setText("Gagal menyiapkan penyimpanan sementara");
-            return;
-        }
-        File photoFile = new File(photoDir, "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
-        ImageCapture.OutputFileOptions output = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
+        ContentValues values = new ContentValues();
+        values.put(
+                MediaStore.Images.Media.DISPLAY_NAME,
+                "JejakTeknisi_" + System.currentTimeMillis() + ".jpg"
+        );
+        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+        values.put(
+                MediaStore.Images.Media.RELATIVE_PATH,
+                "Pictures/JejakTeknisi/Microscope"
+        );
 
-        capture.takePicture(output, ContextCompat.getMainExecutor(this),
+        ImageCapture.OutputFileOptions output =
+                new ImageCapture.OutputFileOptions.Builder(
+                        getContentResolver(),
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        values
+                ).build();
+
+        capture.takePicture(
+                output,
+                ContextCompat.getMainExecutor(this),
                 new ImageCapture.OnImageSavedCallback() {
                     @Override
-                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults result) {
+                    public void onImageSaved(
+                            @NonNull ImageCapture.OutputFileResults result) {
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
-                        Uri uri = FileProvider.getUriForFile(MainActivity.this,
-                                getPackageName() + ".fileprovider", photoFile);
-                        status.setText("Foto siap • belum disimpan ke Galeri");
-                        showPhotoOptions(uri);
+                        status.setText("Foto tersimpan");
+                        showPhotoOptions(result.getSavedUri());
                     }
+
                     @Override
                     public void onError(@NonNull ImageCaptureException error) {
-                        if (photoFile.exists()) photoFile.delete();
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
                         status.setText("Foto gagal");
                     }
-                });
-    }
-
-    private Uri saveBitmapToCache(Bitmap bitmap) {
-        if (bitmap == null) return null;
-        File photoDir = new File(getCacheDir(), "photos");
-        if (!photoDir.exists() && !photoDir.mkdirs()) {
-            status.setText("Gagal menyiapkan foto sementara");
-            return null;
-        }
-        File file = new File(photoDir, "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
-        try (FileOutputStream out = new FileOutputStream(file)) {
-            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) {
-                file.delete();
-                status.setText("Gagal menyiapkan foto");
-                return null;
-            }
-            return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
-        } catch (Exception e) {
-            file.delete();
-            status.setText("Gagal menyiapkan foto");
-            return null;
-        }
-    }
-
-    private void copyUriToGallery(Uri uri) {
-        if (uri == null) return;
-        Uri galleryUri = null;
-        try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
-            if (in == null) throw new java.io.IOException("Input kosong");
-            ContentValues values = new ContentValues();
-            values.put(MediaStore.Images.Media.DISPLAY_NAME,
-                    "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
-            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
-            }
-            galleryUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-            if (galleryUri == null) throw new java.io.IOException("Insert gagal");
-            try (java.io.OutputStream out = getContentResolver().openOutputStream(galleryUri)) {
-                if (out == null) throw new java.io.IOException("Output kosong");
-                byte[] buffer = new byte[8192];
-                int len;
-                while ((len = in.read(buffer)) != -1) out.write(buffer, 0, len);
-            }
-            status.setText("Foto tersimpan • Jejak Teknisi");
-        } catch (Exception e) {
-            if (galleryUri != null) getContentResolver().delete(galleryUri, null, null);
-            status.setText("Gagal menyimpan foto");
-        }
+                }
+        );
     }
 
     private void showPhotoOptions(Uri uri) {
-        if (uri == null) {
-            status.setText("Foto tidak tersedia");
-            return;
-        }
+        if (uri == null) return;
 
-        // Tampilkan FOTO DIAM hasil jepretan terlebih dahulu.
-        // Foto hanya berada di cache aplikasi dan TIDAK otomatis masuk Galeri.
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
-        root.setPadding(pad, pad, pad, dp(8));
-
-        ImageView image = new ImageView(this);
-        image.setBackgroundColor(Color.BLACK);
-        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        Bitmap previewBitmap = loadPreviewBitmap(uri, 900, 900);
-        if (previewBitmap != null) image.setImageBitmap(previewBitmap);
-
-        root.addView(image, new LinearLayout.LayoutParams(-1, dp(360)));
-
-        TextView info = new TextView(this);
-        info.setText("Foto diam • belum disimpan ke Galeri");
-        info.setTextSize(15);
-        info.setGravity(Gravity.CENTER);
-        info.setPadding(0, dp(8), 0, dp(8));
-        root.addView(info, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout buttons = new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.VERTICAL);
-
-        Button lens = makeButton("🔎  Google Lens");
-        Button gallery = makeButton("💾  Simpan ke Galeri");
-        Button close = makeButton("✕  Tutup");
-        buttons.addView(lens, new LinearLayout.LayoutParams(-1, dp(56)));
-        buttons.addView(gallery, new LinearLayout.LayoutParams(-1, dp(56)));
-        buttons.addView(close, new LinearLayout.LayoutParams(-1, dp(56)));
-        root.addView(buttons);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Hasil Foto")
-                .setView(root)
-                .create();
-
-        lens.setOnClickListener(v -> {
-            dialog.dismiss();
-            sendToGoogleLens(uri);
-        });
-        gallery.setOnClickListener(v -> {
-            copyUriToGallery(uri);
-            dialog.dismiss();
-        });
-        close.setOnClickListener(v -> dialog.dismiss());
-        dialog.setOnDismissListener(d -> {
-            if (previewBitmap != null && !previewBitmap.isRecycled()) previewBitmap.recycle();
-        });
-        dialog.show();
+        new AlertDialog.Builder(this)
+                .setTitle("Foto berhasil disimpan")
+                .setMessage("Foto tersimpan di Pictures/JejakTeknisi/Microscope")
+                .setPositiveButton("🔎 Google Lens",
+                        (dialog, which) -> sendToGoogleLens(uri))
+                .setNegativeButton("Tutup", null)
+                .show();
     }
 
-    private Bitmap loadPreviewBitmap(Uri uri, int maxWidth, int maxHeight) {
-        try {
-            android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
-            bounds.inJustDecodeBounds = true;
-            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
-                if (in == null) return null;
-                android.graphics.BitmapFactory.decodeStream(in, null, bounds);
-            }
+    private void sendToGoogleLens(Uri uri) {
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("image/jpeg");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setPackage("com.google.android.googlequicksearchbox");
 
-            int sample = 1;
-            while (bounds.outWidth / sample > maxWidth || bounds.outHeight / sample > maxHeight) {
-                sample *= 2;
-            }
-            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
-            opts.inSampleSize = Math.max(1, sample);
-            opts.inPreferredConfig = Bitmap.Config.RGB_565;
-            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
-                if (in == null) return null;
-                return android.graphics.BitmapFactory.decodeStream(in, null, opts);
-            }
+        try {
+            startActivity(intent);
         } catch (Exception e) {
-            return null;
+            intent.setPackage(null);
+            startActivity(Intent.createChooser(intent, "Buka foto dengan"));
         }
-    }
-
-    private void sendToGoogleLens(Uri imageUri) {
-        // Use the same Lens deep-link contract Chromium uses for image search.
-        // Do not use ACTION_SEND/ACTION_CHOOSER: those open the Android Share Sheet.
-        if (imageUri == null) {
-            status.setText("Foto belum siap untuk Google Lens");
-            return;
-        }
-
-        final String googlePackage = "com.google.android.googlequicksearchbox";
-        try {
-            // Lens needs temporary read access to the app's FileProvider URI.
-            grantUriPermission(googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-            // Chromium's current Lens contract uses google://lens (or googleapp://lens)
-            // with LensBitmapUriKey and a launch timestamp. Try the direct contract first.
-            Uri lensUri = new Uri.Builder()
-                    .scheme("google")
-                    .authority("lens")
-                    .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
-                    .appendQueryParameter("ActivityLaunchTimestampNanos",
-                            Long.toString(System.nanoTime()))
-                    .build();
-
-            Intent intent = new Intent(Intent.ACTION_VIEW, lensUri);
-            intent.setPackage(googlePackage);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(intent);
-            status.setText("Membuka Google Lens…");
-            return;
-        } catch (Exception ignored) {
-            // Try Google's other Lens contract below.
-        }
-
-        try {
-            grantUriPermission(googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            Uri lensUri = new Uri.Builder()
-                    .scheme("googleapp")
-                    .authority("lens")
-                    .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
-                    .appendQueryParameter("ActivityLaunchTimestampNanos",
-                            Long.toString(System.nanoTime()))
-                    .build();
-
-            Intent intent = new Intent(Intent.ACTION_VIEW, lensUri);
-            intent.setPackage(googlePackage);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(intent);
-            status.setText("Membuka Google Lens…");
-            return;
-        } catch (Exception ignored) {
-        }
-
-        status.setText("Google Lens tidak dapat dibuka. Pastikan aplikasi Google sudah terpasang dan diperbarui.");
     }
 
     @Override
@@ -1772,9 +1522,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {
         }
-        releaseFrozenBitmap();
-        camera = null;
-        capture = null;
         super.onDestroy();
     }
 }
