@@ -33,6 +33,9 @@ import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 import android.content.ActivityNotFoundException;
 import android.os.Build;
+import java.io.File;
+import java.io.FileOutputStream;
+import androidx.core.content.FileProvider;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -1504,12 +1507,14 @@ public class MainActivity extends AppCompatActivity {
     private void takePhoto() {
         if (frozen && frozenBitmap != null) {
             Bitmap zoomed = getFrozenZoomedBitmap();
-            if (zoomed != null) {
-                saveBitmap(zoomed);
-                if (!zoomed.isRecycled()) zoomed.recycle();
-            } else {
-                saveBitmap(frozenBitmap);
+            Uri uri = null;
+            try {
+                uri = zoomed != null ? saveBitmapToCache(zoomed) : saveBitmapToCache(frozenBitmap);
+            } finally {
+                if (zoomed != null && !zoomed.isRecycled()) zoomed.recycle();
             }
+            status.setText("Foto siap • belum disimpan ke Galeri");
+            showPhotoOptions(uri);
             return;
         }
 
@@ -1521,55 +1526,93 @@ public class MainActivity extends AppCompatActivity {
         photoBtn.setEnabled(false);
         photoBtn.setText("📸\nMEMOTRET...");
 
-        ContentValues values = new ContentValues();
-        values.put(
-                MediaStore.Images.Media.DISPLAY_NAME,
-                "JejakTeknisi_" + System.currentTimeMillis() + ".jpg"
-        );
-        values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
-        values.put(
-                MediaStore.Images.Media.RELATIVE_PATH,
-                "Pictures/JejakTeknisi/Microscope"
-        );
+        File photoDir = new File(getCacheDir(), "photos");
+        if (!photoDir.exists() && !photoDir.mkdirs()) {
+            photoBtn.setEnabled(true);
+            photoBtn.setText("📸\nFOTO");
+            status.setText("Gagal menyiapkan penyimpanan sementara");
+            return;
+        }
+        File photoFile = new File(photoDir, "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
+        ImageCapture.OutputFileOptions output = new ImageCapture.OutputFileOptions.Builder(photoFile).build();
 
-        ImageCapture.OutputFileOptions output =
-                new ImageCapture.OutputFileOptions.Builder(
-                        getContentResolver(),
-                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        values
-                ).build();
-
-        capture.takePicture(
-                output,
-                ContextCompat.getMainExecutor(this),
+        capture.takePicture(output, ContextCompat.getMainExecutor(this),
                 new ImageCapture.OnImageSavedCallback() {
                     @Override
-                    public void onImageSaved(
-                            @NonNull ImageCapture.OutputFileResults result) {
+                    public void onImageSaved(@NonNull ImageCapture.OutputFileResults result) {
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
-                        status.setText("Foto tersimpan");
-                        showPhotoOptions(result.getSavedUri());
+                        Uri uri = FileProvider.getUriForFile(MainActivity.this,
+                                getPackageName() + ".fileprovider", photoFile);
+                        status.setText("Foto siap • belum disimpan ke Galeri");
+                        showPhotoOptions(uri);
                     }
-
                     @Override
                     public void onError(@NonNull ImageCaptureException error) {
+                        if (photoFile.exists()) photoFile.delete();
                         photoBtn.setEnabled(true);
                         photoBtn.setText("📸\nFOTO");
                         status.setText("Foto gagal");
                     }
-                }
-        );
+                });
+    }
+
+    private Uri saveBitmapToCache(Bitmap bitmap) {
+        if (bitmap == null) return null;
+        File photoDir = new File(getCacheDir(), "photos");
+        if (!photoDir.exists() && !photoDir.mkdirs()) {
+            status.setText("Gagal menyiapkan foto sementara");
+            return null;
+        }
+        File file = new File(photoDir, "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
+        try (FileOutputStream out = new FileOutputStream(file)) {
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) {
+                file.delete();
+                status.setText("Gagal menyiapkan foto");
+                return null;
+            }
+            return FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+        } catch (Exception e) {
+            file.delete();
+            status.setText("Gagal menyiapkan foto");
+            return null;
+        }
+    }
+
+    private void copyUriToGallery(Uri uri) {
+        if (uri == null) return;
+        Uri galleryUri = null;
+        try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new java.io.IOException("Input kosong");
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.Images.Media.DISPLAY_NAME,
+                    "JejakTeknisi_" + System.currentTimeMillis() + ".jpg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
+            }
+            galleryUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (galleryUri == null) throw new java.io.IOException("Insert gagal");
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(galleryUri)) {
+                if (out == null) throw new java.io.IOException("Output kosong");
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = in.read(buffer)) != -1) out.write(buffer, 0, len);
+            }
+            status.setText("Foto tersimpan • Jejak Teknisi");
+        } catch (Exception e) {
+            if (galleryUri != null) getContentResolver().delete(galleryUri, null, null);
+            status.setText("Gagal menyimpan foto");
+        }
     }
 
     private void showPhotoOptions(Uri uri) {
         if (uri == null) return;
-
         new AlertDialog.Builder(this)
-                .setTitle("Foto berhasil disimpan")
-                .setMessage("Foto tersimpan di Pictures/JejakTeknisi/Microscope")
-                .setPositiveButton("🔎 Google Lens",
-                        (dialog, which) -> sendToGoogleLens(uri))
+                .setTitle("Foto berhasil disiapkan")
+                .setMessage("Foto belum disimpan ke Galeri. Pilih tindakan yang diinginkan.")
+                .setPositiveButton("🔎 Google Lens", (dialog, which) -> sendToGoogleLens(uri))
+                .setNeutralButton("💾 Simpan ke Galeri", (dialog, which) -> copyUriToGallery(uri))
                 .setNegativeButton("Tutup", null)
                 .show();
     }
