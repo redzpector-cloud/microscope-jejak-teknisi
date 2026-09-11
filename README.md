@@ -24,3 +24,9 @@ Workflow berada di `.github/workflows/main.yml`.
 - Added Android package visibility for Google/Lens on Android 11+.
 - Photo remains in app cache until the user chooses Gallery.
 - Increased the zoom/exposure info row height so labels are not clipped.
+
+
+## V4
+- Google Lens direct intent now tries `google://lens` first, matching Chromium's current Lens contract, with `LensBitmapUriKey` and `ActivityLaunchTimestampNanos`.
+- No Android Share Sheet fallback.
+- Zoom text area enlarged to prevent clipping.

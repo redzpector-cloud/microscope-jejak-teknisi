@@ -265,10 +265,10 @@ public class MainActivity extends AppCompatActivity {
         infoRow.setBackgroundColor(Color.BLACK);
 
         zoomText = makeInfoText("Zoom 1.0×");
-        zoomText.setTextSize(14);
+        zoomText.setTextSize(18);
         exposureText = makeInfoText("Exposure 0 • NORMAL");
         exposureText.setTextSize(14);
-        infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(30), 1));
+        infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(58), 1));
         infoRow.addView(exposureText, new LinearLayout.LayoutParams(0, dp(30), 1));
         root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(48)));
 
@@ -1693,56 +1693,52 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void sendToGoogleLens(Uri imageUri) {
-        // Open Google Lens directly. Do NOT use ACTION_SEND/ACTION_CHOOSER,
-        // because those open the Android Share Sheet.
+        // Use the same Lens deep-link contract Chromium uses for image search.
+        // Do not use ACTION_SEND/ACTION_CHOOSER: those open the Android Share Sheet.
         if (imageUri == null) {
             status.setText("Foto belum siap untuk Google Lens");
             return;
         }
 
         final String googlePackage = "com.google.android.googlequicksearchbox";
-        final String[] lensSchemes = {"googleapp", "google"};
-
         try {
-            // Give Google a temporary read permission for the cached image.
-            grantUriPermission(googlePackage, imageUri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // Lens needs temporary read access to the app's FileProvider URI.
+            grantUriPermission(googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            // Chromium's current Lens contract uses google://lens (or googleapp://lens)
+            // with LensBitmapUriKey and a launch timestamp. Try the direct contract first.
+            Uri lensUri = new Uri.Builder()
+                    .scheme("google")
+                    .authority("lens")
+                    .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
+                    .appendQueryParameter("ActivityLaunchTimestampNanos",
+                            Long.toString(System.nanoTime()))
+                    .build();
+
+            Intent intent = new Intent(Intent.ACTION_VIEW, lensUri);
+            intent.setPackage(googlePackage);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+            status.setText("Membuka Google Lens…");
+            return;
         } catch (Exception ignored) {
+            // Try Google's other Lens contract below.
         }
 
-        for (String scheme : lensSchemes) {
-            try {
-                Uri lensUri = new Uri.Builder()
-                        .scheme(scheme)
-                        .authority("lens")
-                        .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
-                        .build();
-
-                Intent lensIntent = new Intent(Intent.ACTION_VIEW, lensUri);
-                lensIntent.setPackage(googlePackage);
-                lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        | Intent.FLAG_ACTIVITY_NEW_TASK);
-
-                // Try the explicit Google package first. Android 11+ package
-                // visibility is also declared in AndroidManifest.xml.
-                startActivity(lensIntent);
-                status.setText("Membuka Google Lens…");
-                return;
-            } catch (android.content.ActivityNotFoundException ignored) {
-                // Try the next Lens URI contract.
-            } catch (Exception ignored) {
-                // Keep the app alive if a vendor ROM rejects the deep link.
-            }
-        }
-
-        // Some devices expose Lens through the standalone package. Try its
-        // Lens activity without ever falling back to ACTION_SEND.
         try {
-            Intent standalone = new Intent(Intent.ACTION_VIEW);
-            standalone.setData(Uri.parse("googleapp://lens"));
-            standalone.setPackage("com.google.ar.lens");
-            standalone.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            startActivity(standalone);
+            grantUriPermission(googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Uri lensUri = new Uri.Builder()
+                    .scheme("googleapp")
+                    .authority("lens")
+                    .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
+                    .appendQueryParameter("ActivityLaunchTimestampNanos",
+                            Long.toString(System.nanoTime()))
+                    .build();
+
+            Intent intent = new Intent(Intent.ACTION_VIEW, lensUri);
+            intent.setPackage(googlePackage);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
             status.setText("Membuka Google Lens…");
             return;
         } catch (Exception ignored) {
