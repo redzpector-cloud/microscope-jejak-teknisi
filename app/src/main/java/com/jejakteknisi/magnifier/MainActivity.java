@@ -1063,7 +1063,7 @@ public class MainActivity extends AppCompatActivity {
                 paint.setColor(Color.argb(190,0,0,0));
                 canvas.drawRoundRect(new RectF(midX-boxW/2, midY-boxH/2, midX+boxW/2, midY+boxH/2), boxH/2, boxH/2, paint);
                 paint.setColor(a.color);
-                paint.setTextSize(dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                paint.setTextSize(dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f)));
                 paint.setTypeface(Typeface.DEFAULT_BOLD);
                 canvas.drawText("JMP", midX-paint.measureText("JMP")/2f, midY+paint.getTextSize()/3f, paint);
                 canvas.restore();
