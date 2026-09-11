@@ -1708,7 +1708,7 @@ public class MainActivity extends AppCompatActivity {
                         .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
                         .build();
 
-                getContentResolver().grantUriPermission(
+                grantUriPermission(
                         googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
                 Intent lensIntent = new Intent(Intent.ACTION_VIEW, lensUri);
