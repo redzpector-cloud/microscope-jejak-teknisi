@@ -1607,14 +1607,87 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPhotoOptions(Uri uri) {
-        if (uri == null) return;
-        new AlertDialog.Builder(this)
-                .setTitle("Foto berhasil disiapkan")
-                .setMessage("Foto belum disimpan ke Galeri. Pilih tindakan yang diinginkan.")
-                .setPositiveButton("🔎 Google Lens", (dialog, which) -> sendToGoogleLens(uri))
-                .setNeutralButton("💾 Simpan ke Galeri", (dialog, which) -> copyUriToGallery(uri))
-                .setNegativeButton("Tutup", null)
-                .show();
+        if (uri == null) {
+            status.setText("Foto tidak tersedia");
+            return;
+        }
+
+        // Tampilkan FOTO DIAM hasil jepretan terlebih dahulu.
+        // Foto hanya berada di cache aplikasi dan TIDAK otomatis masuk Galeri.
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(16);
+        root.setPadding(pad, pad, pad, dp(8));
+
+        ImageView image = new ImageView(this);
+        image.setBackgroundColor(Color.BLACK);
+        image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        Bitmap previewBitmap = loadPreviewBitmap(uri, 900, 900);
+        if (previewBitmap != null) image.setImageBitmap(previewBitmap);
+
+        root.addView(image, new LinearLayout.LayoutParams(-1, dp(360)));
+
+        TextView info = new TextView(this);
+        info.setText("Foto diam • belum disimpan ke Galeri");
+        info.setTextSize(15);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(0, dp(8), 0, dp(8));
+        root.addView(info, new LinearLayout.LayoutParams(-1, -2));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.VERTICAL);
+
+        Button lens = makeButton("🔎  Google Lens");
+        Button gallery = makeButton("💾  Simpan ke Galeri");
+        Button close = makeButton("✕  Tutup");
+        buttons.addView(lens, new LinearLayout.LayoutParams(-1, dp(56)));
+        buttons.addView(gallery, new LinearLayout.LayoutParams(-1, dp(56)));
+        buttons.addView(close, new LinearLayout.LayoutParams(-1, dp(56)));
+        root.addView(buttons);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Hasil Foto")
+                .setView(root)
+                .create();
+
+        lens.setOnClickListener(v -> {
+            dialog.dismiss();
+            sendToGoogleLens(uri);
+        });
+        gallery.setOnClickListener(v -> {
+            copyUriToGallery(uri);
+            dialog.dismiss();
+        });
+        close.setOnClickListener(v -> dialog.dismiss());
+        dialog.setOnDismissListener(d -> {
+            if (previewBitmap != null && !previewBitmap.isRecycled()) previewBitmap.recycle();
+        });
+        dialog.show();
+    }
+
+    private Bitmap loadPreviewBitmap(Uri uri, int maxWidth, int maxHeight) {
+        try {
+            android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) return null;
+                android.graphics.BitmapFactory.decodeStream(in, null, bounds);
+            }
+
+            int sample = 1;
+            while (bounds.outWidth / sample > maxWidth || bounds.outHeight / sample > maxHeight) {
+                sample *= 2;
+            }
+            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+            opts.inSampleSize = Math.max(1, sample);
+            opts.inPreferredConfig = Bitmap.Config.RGB_565;
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) return null;
+                return android.graphics.BitmapFactory.decodeStream(in, null, opts);
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void sendToGoogleLens(Uri uri) {
@@ -1623,6 +1696,8 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        // Jangan pernah menampilkan Android Share/Intent Resolver.
+        // Hanya kirim ke Google Lens jika Google app tersedia.
         Intent lensIntent = new Intent(Intent.ACTION_SEND);
         lensIntent.setType("image/jpeg");
         lensIntent.putExtra(Intent.EXTRA_STREAM, uri);
@@ -1630,25 +1705,13 @@ public class MainActivity extends AppCompatActivity {
         lensIntent.setPackage("com.google.android.googlequicksearchbox");
 
         try {
-            if (lensIntent.resolveActivity(getPackageManager()) != null) {
-                startActivity(lensIntent);
+            if (lensIntent.resolveActivity(getPackageManager()) == null) {
+                status.setText("Google Lens tidak tersedia di HP ini");
                 return;
             }
-        } catch (RuntimeException ignored) {
-        }
-
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("image/jpeg");
-        shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
-        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        try {
-            if (shareIntent.resolveActivity(getPackageManager()) == null) {
-                status.setText("Tidak ada aplikasi untuk membuka foto");
-                return;
-            }
-            startActivity(Intent.createChooser(shareIntent, "Buka foto dengan"));
+            startActivity(lensIntent);
         } catch (ActivityNotFoundException | SecurityException e) {
-            status.setText("Google Lens/aplikasi foto tidak tersedia");
+            status.setText("Google Lens tidak dapat dibuka");
         }
     }
 
