@@ -20,6 +20,7 @@ import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.view.View;
+import android.view.ViewParent;
 import android.view.ScaleGestureDetector;
 import android.graphics.Matrix;
 
@@ -506,7 +507,7 @@ public class MainActivity extends AppCompatActivity {
         } else {
             frozenBitmap = null;
             if (freezeView != null) {
-                View parent = freezeView.getParent();
+                ViewParent parent = freezeView.getParent();
                 if (parent instanceof FrameLayout) {
                     ((FrameLayout) parent).removeView(freezeView);
                 }
