@@ -185,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.8");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.9");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -427,6 +427,9 @@ public class MainActivity extends AppCompatActivity {
         Button text = makeButton("T\nTeks");
         Button ocr = makeButton("🔎\nOCR");
         Button undo = makeButton("↩\nUndo");
+        Button redo = makeButton("↪\nRedo");
+        Button duplicate = makeButton("⧉\nDuplikat");
+        Button edit = makeButton("✎\nEdit");
         Button clear = makeButton("✕\nHapus");
         Button save = makeButton("💾\nSimpan");
         Button share = makeButton("↗\nShare");
@@ -436,7 +439,7 @@ public class MainActivity extends AppCompatActivity {
             b.setTextSize(10);
             toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
         }
-        Button[] row2 = {ocr, undo, clear, save, share};
+        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear, save, share};
         for (Button b : row2) {
             b.setTextSize(10);
             toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
@@ -468,15 +471,18 @@ public class MainActivity extends AppCompatActivity {
         select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • 2 jari untuk putar"));
         ocr.setOnClickListener(v -> detectOcrOnFrozenImage());
         undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
+        redo.setOnClickListener(v -> { annotationView.redo(); status.setText("Redo anotasi"); });
+        duplicate.setOnClickListener(v -> { if (annotationView.duplicateSelected()) status.setText("Objek diduplikat"); else status.setText("Pilih objek dulu"); });
+        edit.setOnClickListener(v -> editSelectedText());
         clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
         save.setOnClickListener(v -> saveAnnotatedFreeze());
         share.setOnClickListener(v -> shareAnnotatedFreeze());
 
         red.setTextColor(Color.RED); yellow.setTextColor(Color.YELLOW); green.setTextColor(Color.GREEN); blue.setTextColor(Color.CYAN);
-        red.setOnClickListener(v -> { annotationView.setColor(Color.RED); status.setText("Warna merah dipilih"); });
-        yellow.setOnClickListener(v -> { annotationView.setColor(Color.YELLOW); status.setText("Warna kuning dipilih"); });
-        green.setOnClickListener(v -> { annotationView.setColor(Color.GREEN); status.setText("Warna hijau dipilih"); });
-        blue.setOnClickListener(v -> { annotationView.setColor(Color.CYAN); status.setText("Warna biru dipilih"); });
+        red.setOnClickListener(v -> { annotationView.setColor(Color.RED); status.setText("Warna merah"); });
+        yellow.setOnClickListener(v -> { annotationView.setColor(Color.YELLOW); status.setText("Warna kuning"); });
+        green.setOnClickListener(v -> { annotationView.setColor(Color.GREEN); status.setText("Warna hijau"); });
+        blue.setOnClickListener(v -> { annotationView.setColor(Color.CYAN); status.setText("Warna biru"); });
         small.setOnClickListener(v -> { annotationView.setSize(3); status.setText("Ukuran kecil"); });
         medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
@@ -518,6 +524,7 @@ public class MainActivity extends AppCompatActivity {
                 .addOnSuccessListener(result -> {
                     java.util.ArrayList<String> found = new java.util.ArrayList<>();
                     int count = 0;
+                    boolean historyPushed = false;
                     for (Text.TextBlock block : result.getTextBlocks()) {
                         for (Text.Line line : block.getLines()) {
                             String value = line.getText() == null ? "" : line.getText().trim();
@@ -529,6 +536,7 @@ public class MainActivity extends AppCompatActivity {
                             float y1 = crop.top + r.top * sy;
                             float x2 = crop.left + r.right * sx;
                             float y2 = crop.top + r.bottom * sy;
+                            if (!historyPushed) { annotationView.prepareOcrHistory(); historyPushed=true; }
                             annotationView.addOcr(x1, y1, x2, y2, value);
                             found.add(value);
                             count++;
@@ -664,6 +672,30 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void editSelectedText() {
+        if (annotationView == null || !annotationView.hasSelectedText()) {
+            status.setText("Pilih objek Teks dulu");
+            return;
+        }
+        final Annotation a = annotationView.getSelectedText();
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setSingleLine(true);
+        input.setText(a.text == null ? "" : a.text);
+        input.setTextColor(Color.WHITE);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("Edit teks")
+                .setView(input)
+                .setPositiveButton("Simpan", (d, which) -> {
+                    String value = input.getText().toString().trim();
+                    if (!value.isEmpty()) { annotationView.changeSelectedText(value); status.setText("Teks diperbarui"); }
+                })
+                .setNegativeButton("Batal", null).create();
+        dialog.setOnShowListener(d -> { input.requestFocus(); input.selectAll();
+            input.postDelayed(() -> { InputMethodManager imm=(InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE); if(imm!=null) imm.showSoftInput(input, InputMethodManager.SHOW_IMPLICIT); }, 120);
+        });
+        dialog.show();
+    }
+
     private void shareAnnotatedFreeze() {
         if (!frozen || frozenBitmap == null || annotationView == null) {
             status.setText("Bekukan gambar dulu");
@@ -691,6 +723,11 @@ public class MainActivity extends AppCompatActivity {
         private float lastSelectX, lastSelectY;
         private float lastRotateAngle = 0f;
         private boolean rotatingSelected = false;
+        private boolean transformingSelected = false;
+        private boolean moveHistoryPushed = false;
+        private float lastTransformDistance = 0f;
+        private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> undoStack = new java.util.ArrayDeque<>();
+        private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> redoStack = new java.util.ArrayDeque<>();
 
         AnnotationView(Context context) {
             super(context);
@@ -699,14 +736,44 @@ public class MainActivity extends AppCompatActivity {
         }
 
         void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; invalidate(); }
+        void prepareOcrHistory(){ if(!items.isEmpty() || items.isEmpty()) pushUndo(); }
         void addOcr(float x1, float y1, float x2, float y2, String text) {
             items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
         }
-        void setColor(int color) { currentColor=color; invalidate(); }
-        void setSize(float size) { strokeDp=size; invalidate(); }
+        void setColor(int color) {
+            currentColor=color;
+            if (selected != null) { pushUndo(); selected.color=color; }
+            invalidate();
+        }
+        void setSize(float size) {
+            strokeDp=size;
+            if (selected != null) { pushUndo(); selected.size=size; }
+            invalidate();
+        }
 
-        void undo() { if (!items.isEmpty()) items.remove(items.size()-1); selected=null; invalidate(); }
-        void clearAll() { items.clear(); selected=null; invalidate(); }
+        private java.util.ArrayList<Annotation> copyItems() {
+            java.util.ArrayList<Annotation> out=new java.util.ArrayList<>();
+            for(Annotation a:items) out.add(a.copy());
+            return out;
+        }
+        private void pushUndo() { undoStack.push(copyItems()); redoStack.clear(); }
+        void undo() {
+            if (undoStack.isEmpty()) return;
+            redoStack.push(copyItems()); items.clear(); items.addAll(undoStack.pop()); selected=null; invalidate();
+        }
+        void redo() {
+            if (redoStack.isEmpty()) return;
+            undoStack.push(copyItems()); items.clear(); items.addAll(redoStack.pop()); selected=null; invalidate();
+        }
+        void clearAll() { if (!items.isEmpty()) pushUndo(); items.clear(); selected=null; invalidate(); }
+        boolean duplicateSelected() {
+            if (selected==null) return false;
+            pushUndo(); Annotation c=selected.copy(); float dx=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+            c.x1+=dx; c.y1+=dx; c.x2+=dx; c.y2+=dx; items.add(c); selected=c; invalidate(); return true;
+        }
+        boolean hasSelectedText(){ return selected!=null && selected.type==AnnotationMode.TEXT; }
+        Annotation getSelectedText(){ return selected; }
+        void changeSelectedText(String value){ if(hasSelectedText()){ pushUndo(); selected.text=value; invalidate(); } }
 
         private float[] viewToSource(float x, float y) {
             Matrix inv = new Matrix();
@@ -724,7 +791,7 @@ public class MainActivity extends AppCompatActivity {
 
         void addTextAtView(float x, float y, String text) {
             float[] p=viewToSource(x,y);
-            items.add(Annotation.text(p[0],p[1],text,currentColor,strokeDp));
+            pushUndo(); items.add(Annotation.text(p[0],p[1],text,currentColor,strokeDp));
             invalidate();
         }
 
@@ -839,6 +906,7 @@ public class MainActivity extends AppCompatActivity {
                 int action=e.getActionMasked();
                 if (action==MotionEvent.ACTION_DOWN) {
                     selected=hitTest(x,y);
+                    moveHistoryPushed=false;
                     lastSelectX=x; lastSelectY=y;
                     rotatingSelected=false;
                     lastRotateAngle=0f;
@@ -849,28 +917,31 @@ public class MainActivity extends AppCompatActivity {
                     if (e.getPointerCount()>=2) {
                         float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
                         float angle=(float)Math.toDegrees(Math.atan2(y1-y0,x1-x0));
-                        if (!rotatingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
-                            lastRotateAngle=angle;
-                            rotatingSelected=true;
+                        float dist=(float)Math.hypot(x1-x0,y1-y0);
+                        if (!transformingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
+                            pushUndo();
+                            lastRotateAngle=angle; lastTransformDistance=dist;
+                            rotatingSelected=true; transformingSelected=true;
                         } else {
                             float delta=angle-lastRotateAngle;
-                            while(delta>180f) delta-=360f;
-                            while(delta<-180f) delta+=360f;
+                            while(delta>180f) delta-=360f; while(delta<-180f) delta+=360f;
                             selected.rotation+=delta;
-                            if(selected.rotation>360f) selected.rotation-=360f;
-                            if(selected.rotation<-360f) selected.rotation+=360f;
-                            lastRotateAngle=angle;
-                            invalidate();
+                            float factor=dist/Math.max(1f,lastTransformDistance);
+                            if (Math.abs(factor-1f)>0.003f) {
+                                float minSize=2f, maxSize=20f;
+                                selected.size=Math.max(minSize,Math.min(maxSize,selected.size*factor));
+                                lastTransformDistance=dist;
+                            }
+                            lastRotateAngle=angle; invalidate();
                         }
                     }
-                    // Prevent the first one-finger move after rotation from jumping.
                     if(action==MotionEvent.ACTION_POINTER_UP) {
-                        rotatingSelected=false;
-                        lastSelectX=x; lastSelectY=y;
+                        rotatingSelected=false; transformingSelected=false; lastSelectX=x; lastSelectY=y;
                     }
                     return true;
                 }
                 if(action==MotionEvent.ACTION_MOVE && selected!=null && !rotatingSelected) {
+                    if (!moveHistoryPushed) { pushUndo(); moveHistoryPushed=true; }
                     float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y);
                     float dx=p2[0]-p1[0], dy=p2[1]-p1[1];
                     selected.x1+=dx; selected.y1+=dy; selected.x2+=dx; selected.y2+=dy;
@@ -888,12 +959,12 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
-            if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
+            if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); pushUndo(); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
             switch(e.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN: startX=x;startY=y;endX=x;endY=y;drawing=true;return true;
                 case MotionEvent.ACTION_MOVE: endX=x;endY=y;invalidate();return true;
                 case MotionEvent.ACTION_UP:
-                    endX=x;endY=y; if(drawing){float[] a=viewToSource(startX,startY),b=viewToSource(endX,endY);items.add(Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));} drawing=false;invalidate();return true;
+                    endX=x;endY=y; if(drawing){float[] a=viewToSource(startX,startY),b=viewToSource(endX,endY);pushUndo(); items.add(Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));} drawing=false;invalidate();return true;
             }
             return true;
         }
@@ -905,6 +976,7 @@ public class MainActivity extends AppCompatActivity {
         static Annotation text(float x,float y,String t,int c,float s){Annotation a=marker(x,y,c,s);a.type=AnnotationMode.TEXT;a.text=t;return a;}
         static Annotation ocr(float x1,float y1,float x2,float y2,String t,int c,float s){Annotation a=shape(AnnotationMode.OCR,x1,y1,x2,y2,c,s);a.text=t;return a;}
         static Annotation shape(AnnotationMode m,float x1,float y1,float x2,float y2,int c,float s){Annotation a=new Annotation();a.type=m;a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.color=c;a.size=s;return a;}
+        Annotation copy(){ Annotation a=new Annotation(); a.type=type; a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.text=text;a.color=color;a.size=size;a.rotation=rotation; return a; }
     }
 
     private void applySystemBarInsets() {
