@@ -95,6 +95,9 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout infoRow;
     private LinearLayout exposureRow;
     private LinearLayout detailRow;
+    private Button cameraMinusBtn;
+    private Button cameraFocusBtn;
+    private Button cameraPlusBtn;
     private boolean torch = false;
 
     // V2.5 PCB inspection / annotation
@@ -181,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.7");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.8");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -280,11 +283,14 @@ public class MainActivity extends AppCompatActivity {
         controls.setBackgroundColor(Color.rgb(10, 12, 14));
 
         Button minus = makeButton("−");
+        cameraMinusBtn = minus;
         torchBtn = makeButton("🔦\nLampu");
         freezeBtn = makeButton("❄️\nBeku");
         photoBtn = makeButton("📸\nFOTO");
         Button focus = makeButton("🎯\nFokus");
+        cameraFocusBtn = focus;
         Button plus = makeButton("+");
+        cameraPlusBtn = plus;
 
         controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .55f));
         controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
@@ -482,6 +488,8 @@ public class MainActivity extends AppCompatActivity {
         annotationView.setMode(annotationMode);
 
         int exposureIndex = rootLayout.indexOfChild(exposureRow);
+        // Freeze layout: maximize the PCB image by hiding all live-only status/adjustment rows.
+        infoRow.setVisibility(View.GONE);
         exposureRow.setVisibility(View.GONE);
         zoomBar.setVisibility(View.GONE);
         detailRow.setVisibility(View.GONE);
@@ -578,6 +586,7 @@ public class MainActivity extends AppCompatActivity {
             cameraBox.removeView(annotationView);
             annotationView = null;
         }
+        if (infoRow != null) infoRow.setVisibility(View.VISIBLE);
         if (zoomBar != null) zoomBar.setVisibility(View.VISIBLE);
         if (exposureRow != null) exposureRow.setVisibility(View.VISIBLE);
         if (detailRow != null) detailRow.setVisibility(View.VISIBLE);
@@ -930,6 +939,36 @@ public class MainActivity extends AppCompatActivity {
         exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
     }
 
+    private void setFreezeFullscreen(boolean freezeMode) {
+        if (topBar != null) topBar.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (status != null) status.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+
+        // In Freeze mode, give almost the entire screen to the frozen PCB image.
+        // Only the annotation toolbar and a single LIVE return button remain.
+        if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (torchBtn != null) torchBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (photoBtn != null) photoBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+        if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
+
+        if (freezeBtn != null) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) freezeBtn.getLayoutParams();
+            if (freezeMode) {
+                lp.width = 0;
+                lp.weight = 1f;
+                lp.height = dp(56);
+                freezeBtn.setText("▶️  LIVE");
+            } else {
+                lp.width = 0;
+                lp.weight = 1f;
+                lp.height = dp(62);
+                freezeBtn.setText("❄️\nBeku");
+            }
+            freezeBtn.setLayoutParams(lp);
+        }
+        if (controlsBar != null) controlsBar.setPadding(dp(4), dp(3), dp(4), dp(6));
+    }
+
     private void toggleFreeze() {
         if (preview == null) return;
 
@@ -965,7 +1004,7 @@ public class MainActivity extends AppCompatActivity {
             zoomBar.setProgress(0);
             updateFrozenImage();
             showAnnotationTools();
-            freezeBtn.setText("▶️\nLIVE");
+            setFreezeFullscreen(true);
             status.setText("❄️ BEKU • pilih alat untuk menandai PCB");
         } else {
             hideAnnotationTools();
@@ -981,7 +1020,7 @@ public class MainActivity extends AppCompatActivity {
             frozenZoom = 1f;
             frozenPanX = 0f;
             frozenPanY = 0f;
-            freezeBtn.setText("❄️\nBeku");
+            setFreezeFullscreen(false);
             updateZoomText();
             status.setText("Kamera LIVE");
         }
