@@ -23,6 +23,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.Camera;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.camera2.interop.Camera2Interop;
+import android.hardware.camera2.CaptureRequest;
 import androidx.camera.core.FocusMeteringAction;
 import androidx.camera.core.ImageCapture;
 import androidx.camera.core.ImageCaptureException;
@@ -47,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
     private SeekBar zoomBar;
     private TextView zoomText;
     private TextView status;
+    private TextView exposureText;
+    private SeekBar exposureBar;
     private Button torchBtn;
     private Button photoBtn;
     private LinearLayout topBar;
@@ -119,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.1");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.2");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -171,6 +175,18 @@ public class MainActivity extends AppCompatActivity {
         zoomText.setGravity(Gravity.CENTER);
         root.addView(zoomText, new LinearLayout.LayoutParams(-1, dp(30)));
 
+        exposureText = new TextView(this);
+        exposureText.setText("Exposure 0");
+        exposureText.setTextColor(Color.WHITE);
+        exposureText.setTextSize(14);
+        exposureText.setGravity(Gravity.CENTER);
+        root.addView(exposureText, new LinearLayout.LayoutParams(-1, dp(28)));
+
+        exposureBar = new SeekBar(this);
+        exposureBar.setMax(8);
+        exposureBar.setProgress(4);
+        root.addView(exposureBar, new LinearLayout.LayoutParams(-1, dp(38)));
+
         zoomBar = new SeekBar(this);
         zoomBar.setMax(100);
         zoomBar.setProgress(0);
@@ -204,6 +220,14 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) setZoomFromProgress(progress);
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) setExposure(progress - 4);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -260,10 +284,13 @@ public class MainActivity extends AppCompatActivity {
 
                 Preview previewUseCase = new Preview.Builder().build();
 
-                capture = new ImageCapture.Builder()
+                        ImageCapture.Builder captureBuilder = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                        .setJpegQuality(95)
-                        .build();
+                        .setJpegQuality(98);
+                Camera2Interop.Extender<ImageCapture> extender = new Camera2Interop.Extender<>(captureBuilder);
+                extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY);
+                extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY);
+                capture = captureBuilder.build();
 
                 provider.unbindAll();
 
@@ -276,6 +303,7 @@ public class MainActivity extends AppCompatActivity {
 
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
+                setExposure(0);
                 status.setText("Kamera siap • tap untuk fokus");
 
             } catch (Exception e) {
@@ -324,6 +352,16 @@ public class MainActivity extends AppCompatActivity {
         updateZoomText();
     }
 
+
+    private void setExposure(int value) {
+        if (camera == null) return;
+        int range = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getUpper();
+        int lower = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
+        int clamped = Math.max(lower, Math.min(range, value));
+        camera.getCameraControl().setExposureCompensationIndex(clamped);
+        exposureText.setText(clamped == 0 ? "Exposure 0 • AUTO" : String.format("Exposure %+d", clamped));
+    }
+
     private void toggleTorch() {
         if (camera == null) {
             status.setText("Kamera belum siap");
@@ -370,12 +408,12 @@ public class MainActivity extends AppCompatActivity {
         ContentValues values = new ContentValues();
         values.put(
                 MediaStore.Images.Media.DISPLAY_NAME,
-                "Magnifier_" + System.currentTimeMillis() + ".jpg"
+                "JejakTeknisi_" + System.currentTimeMillis() + ".jpg"
         );
         values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
         values.put(
                 MediaStore.Images.Media.RELATIVE_PATH,
-                "Pictures/MagnifierMicroscope"
+                "Pictures/JejakTeknisi/Microscope"
         );
 
         ImageCapture.OutputFileOptions output =
@@ -413,7 +451,7 @@ public class MainActivity extends AppCompatActivity {
 
         new AlertDialog.Builder(this)
                 .setTitle("Foto berhasil disimpan")
-                .setMessage("Foto tersimpan di Pictures/MagnifierMicroscope")
+                .setMessage("Foto tersimpan di Pictures/JejakTeknisi/Microscope")
                 .setPositiveButton("🔎 Google Lens",
                         (dialog, which) -> sendToGoogleLens(uri))
                 .setNegativeButton("Tutup", null)
