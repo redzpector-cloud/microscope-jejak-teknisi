@@ -6,6 +6,7 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -53,6 +54,11 @@ public class MainActivity extends AppCompatActivity {
     private SeekBar exposureBar;
     private Button torchBtn;
     private Button photoBtn;
+    private Button detailBtn;
+    private Button autoExposureBtn;
+    private SeekBar detailBar;
+    private TextView detailText;
+    private boolean detailOn = true;
     private LinearLayout topBar;
     private LinearLayout controlsBar;
     private boolean torch = false;
@@ -71,6 +77,16 @@ public class MainActivity extends AppCompatActivity {
         b.setPadding(dp(2), 0, dp(2), 0);
         b.setBackgroundColor(Color.rgb(35, 40, 44));
         return b;
+    }
+
+    private TextView makeInfoText(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(14);
+        t.setGravity(Gravity.CENTER);
+        t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        return t;
     }
 
     @Override
@@ -123,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.2");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.3");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -138,6 +154,10 @@ public class MainActivity extends AppCompatActivity {
                         1
                 )
         );
+
+        detailBtn = makeButton("DETAIL\nON");
+        detailBtn.setTextSize(13);
+        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(92), dp(58)));
 
         root.addView(top);
 
@@ -168,29 +188,47 @@ public class MainActivity extends AppCompatActivity {
                 new LinearLayout.LayoutParams(-1, 0, 1)
         );
 
-        zoomText = new TextView(this);
-        zoomText.setText("Zoom 1.0×");
-        zoomText.setTextColor(Color.WHITE);
-        zoomText.setTextSize(15);
-        zoomText.setGravity(Gravity.CENTER);
-        root.addView(zoomText, new LinearLayout.LayoutParams(-1, dp(30)));
+        LinearLayout infoRow = new LinearLayout(this);
+        infoRow.setOrientation(LinearLayout.HORIZONTAL);
+        infoRow.setGravity(Gravity.CENTER_VERTICAL);
+        infoRow.setPadding(dp(8), 0, dp(8), 0);
+        infoRow.setBackgroundColor(Color.BLACK);
 
-        exposureText = new TextView(this);
-        exposureText.setText("Exposure 0");
-        exposureText.setTextColor(Color.WHITE);
-        exposureText.setTextSize(14);
-        exposureText.setGravity(Gravity.CENTER);
-        root.addView(exposureText, new LinearLayout.LayoutParams(-1, dp(28)));
-
-        exposureBar = new SeekBar(this);
-        exposureBar.setMax(8);
-        exposureBar.setProgress(4);
-        root.addView(exposureBar, new LinearLayout.LayoutParams(-1, dp(38)));
+        zoomText = makeInfoText("Zoom 1.0×");
+        exposureText = makeInfoText("Exposure 0 • NORMAL");
+        infoRow.addView(zoomText, new LinearLayout.LayoutParams(0, dp(30), 1));
+        infoRow.addView(exposureText, new LinearLayout.LayoutParams(0, dp(30), 1));
+        root.addView(infoRow, new LinearLayout.LayoutParams(-1, dp(30)));
 
         zoomBar = new SeekBar(this);
         zoomBar.setMax(100);
         zoomBar.setProgress(0);
-        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(42)));
+        root.addView(zoomBar, new LinearLayout.LayoutParams(-1, dp(38)));
+
+        LinearLayout exposureRow = new LinearLayout(this);
+        exposureRow.setOrientation(LinearLayout.HORIZONTAL);
+        exposureRow.setGravity(Gravity.CENTER_VERTICAL);
+        exposureRow.setPadding(dp(8), 0, dp(8), 0);
+        exposureBar = new SeekBar(this);
+        exposureBar.setMax(8);
+        exposureBar.setProgress(4);
+        exposureRow.addView(exposureBar, new LinearLayout.LayoutParams(0, dp(40), 1));
+        autoExposureBtn = makeButton("AUTO");
+        autoExposureBtn.setTextSize(12);
+        exposureRow.addView(autoExposureBtn, new LinearLayout.LayoutParams(dp(68), dp(40)));
+        root.addView(exposureRow, new LinearLayout.LayoutParams(-1, dp(44)));
+
+        LinearLayout detailRow = new LinearLayout(this);
+        detailRow.setOrientation(LinearLayout.HORIZONTAL);
+        detailRow.setGravity(Gravity.CENTER_VERTICAL);
+        detailRow.setPadding(dp(8), 0, dp(8), 0);
+        detailText = makeInfoText("Detail 80%");
+        detailRow.addView(detailText, new LinearLayout.LayoutParams(dp(88), dp(38)));
+        detailBar = new SeekBar(this);
+        detailBar.setMax(100);
+        detailBar.setProgress(80);
+        detailRow.addView(detailBar, new LinearLayout.LayoutParams(0, dp(38), 1));
+        root.addView(detailRow, new LinearLayout.LayoutParams(-1, dp(40)));
 
         LinearLayout controls = new LinearLayout(this);
         controlsBar = controls;
@@ -231,6 +269,23 @@ public class MainActivity extends AppCompatActivity {
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        detailBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                detailText.setText("Detail " + progress + "%");
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+        });
+
+        autoExposureBtn.setOnClickListener(v -> setExposure(0));
+        detailBtn.setOnClickListener(v -> {
+            detailOn = !detailOn;
+            detailBtn.setText(detailOn ? "DETAIL\nON" : "DETAIL\nOFF");
+            if (camera != null) {
+                status.setText(detailOn ? "Detail high quality ON" : "Detail normal");
+            }
         });
 
         minus.setOnClickListener(v -> changeZoom(-0.5f));
@@ -304,7 +359,7 @@ public class MainActivity extends AppCompatActivity {
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
                 setExposure(0);
-                status.setText("Kamera siap • tap untuk fokus");
+                status.setText("Kamera siap • tap untuk fokus • Detail ON");
 
             } catch (Exception e) {
                 status.setText("Kamera gagal");
@@ -359,7 +414,8 @@ public class MainActivity extends AppCompatActivity {
         int lower = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
         int clamped = Math.max(lower, Math.min(range, value));
         camera.getCameraControl().setExposureCompensationIndex(clamped);
-        exposureText.setText(clamped == 0 ? "Exposure 0 • AUTO" : String.format("Exposure %+d", clamped));
+        exposureBar.setProgress(clamped + 4);
+        exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
     }
 
     private void toggleTorch() {
@@ -392,8 +448,10 @@ public class MainActivity extends AppCompatActivity {
                         FocusMeteringAction.FLAG_AF
                 ).build();
 
-        camera.getCameraControl().startFocusAndMetering(action);
         status.setText("Fokus...");
+        camera.getCameraControl().startFocusAndMetering(action)
+                .addListener(() -> status.setText("Fokus siap"),
+                        ContextCompat.getMainExecutor(this));
     }
 
     private void takePhoto() {
