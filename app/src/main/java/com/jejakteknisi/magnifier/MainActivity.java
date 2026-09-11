@@ -31,6 +31,12 @@ import android.graphics.drawable.ColorDrawable;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
 
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
 import androidx.annotation.NonNull;
 import com.google.common.util.concurrent.ListenableFuture;
 import androidx.appcompat.app.AppCompatActivity;
@@ -91,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout cameraBox;
     private AnnotationView annotationView;
     private LinearLayout annotationBar;
-    private enum AnnotationMode { NONE, MARKER, ARROW, CIRCLE, TEXT }
+    private enum AnnotationMode { NONE, SELECT, MARKER, ARROW, CIRCLE, TEXT, OCR }
     private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
@@ -170,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.5.1");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.7");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -386,65 +392,169 @@ public class MainActivity extends AppCompatActivity {
         if (annotationBar != null) return;
 
         annotationBar = new LinearLayout(this);
-        annotationBar.setOrientation(LinearLayout.HORIZONTAL);
+        annotationBar.setOrientation(LinearLayout.VERTICAL);
         annotationBar.setGravity(Gravity.CENTER);
-        annotationBar.setPadding(dp(4), dp(4), dp(4), dp(4));
+        annotationBar.setPadding(dp(4), dp(3), dp(4), dp(3));
         annotationBar.setBackgroundColor(Color.rgb(22, 24, 27));
 
+        LinearLayout toolRow1 = new LinearLayout(this);
+        toolRow1.setOrientation(LinearLayout.HORIZONTAL);
+        toolRow1.setGravity(Gravity.CENTER);
+        LinearLayout toolRow2 = new LinearLayout(this);
+        toolRow2.setOrientation(LinearLayout.HORIZONTAL);
+        toolRow2.setGravity(Gravity.CENTER);
+        LinearLayout optionRow = new LinearLayout(this);
+        optionRow.setOrientation(LinearLayout.HORIZONTAL);
+        optionRow.setGravity(Gravity.CENTER);
+
+        Button pan = makeButton("✋\nGeser");
+        Button select = makeButton("☝\nPilih");
         Button marker = makeButton("●\nTitik");
         Button arrow = makeButton("➜\nPanah");
         Button circle = makeButton("○\nLingkar");
         Button text = makeButton("T\nTeks");
+        Button ocr = makeButton("🔎\nOCR");
         Button undo = makeButton("↩\nUndo");
         Button clear = makeButton("✕\nHapus");
         Button save = makeButton("💾\nSimpan");
+        Button share = makeButton("↗\nShare");
 
-        Button[] buttons = {marker, arrow, circle, text, undo, clear, save};
-        for (Button b : buttons) {
-            annotationBar.addView(b, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        Button[] row1 = {pan, select, marker, arrow, circle, text};
+        for (Button b : row1) {
+            b.setTextSize(10);
+            toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(46), 1f));
+        }
+        Button[] row2 = {ocr, undo, clear, save, share};
+        for (Button b : row2) {
+            b.setTextSize(10);
+            toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(42), 1f));
         }
 
-        marker.setOnClickListener(v -> {
-            annotationMode = AnnotationMode.MARKER;
-            annotationView.setMode(annotationMode);
-            status.setText("Marker aktif • tap titik komponen");
-        });
-        arrow.setOnClickListener(v -> {
-            annotationMode = AnnotationMode.ARROW;
-            annotationView.setMode(annotationMode);
-            status.setText("Panah aktif • tarik dari awal ke akhir");
-        });
-        circle.setOnClickListener(v -> {
-            annotationMode = AnnotationMode.CIRCLE;
-            annotationView.setMode(annotationMode);
-            status.setText("Lingkaran aktif • tarik mengelilingi komponen");
-        });
-        text.setOnClickListener(v -> {
-            annotationMode = AnnotationMode.TEXT;
-            annotationView.setMode(annotationMode);
-            status.setText("Teks aktif • tap lokasi untuk menulis catatan");
-        });
-        undo.setOnClickListener(v -> {
-            annotationView.undo();
-            status.setText("Undo anotasi");
-        });
-        clear.setOnClickListener(v -> {
-            annotationView.clearAll();
-            status.setText("Semua anotasi dihapus");
-        });
-        save.setOnClickListener(v -> saveAnnotatedFreeze());
+        Button red = makeButton("●");
+        Button yellow = makeButton("●");
+        Button green = makeButton("●");
+        Button blue = makeButton("●");
+        Button small = makeButton("S");
+        Button medium = makeButton("M");
+        Button large = makeButton("L");
+        TextView legend = makeInfoText("Warna / Ukuran");
+        legend.setTextSize(10);
 
-        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
-                -1, -2, Gravity.BOTTOM);
-        barParams.bottomMargin = dp(4);
+        Button[] opts = {red, yellow, green, blue, small, medium, large};
+        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(32), 1.7f));
+        for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(32), .55f));
+
+        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(48)));
+        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(44)));
+        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(34)));
+
+        pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
+        marker.setOnClickListener(v -> setAnnotationMode(AnnotationMode.MARKER, "Marker aktif • tap titik komponen"));
+        arrow.setOnClickListener(v -> setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"));
+        circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"));
+        text.setOnClickListener(v -> setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"));
+        select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser tanda untuk memindahkannya"));
+        ocr.setOnClickListener(v -> detectOcrOnFrozenImage());
+        undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
+        clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
+        save.setOnClickListener(v -> saveAnnotatedFreeze());
+        share.setOnClickListener(v -> shareAnnotatedFreeze());
+
+        red.setTextColor(Color.RED); yellow.setTextColor(Color.YELLOW); green.setTextColor(Color.GREEN); blue.setTextColor(Color.CYAN);
+        red.setOnClickListener(v -> { annotationView.setColor(Color.RED); status.setText("Warna merah dipilih"); });
+        yellow.setOnClickListener(v -> { annotationView.setColor(Color.YELLOW); status.setText("Warna kuning dipilih"); });
+        green.setOnClickListener(v -> { annotationView.setColor(Color.GREEN); status.setText("Warna hijau dipilih"); });
+        blue.setOnClickListener(v -> { annotationView.setColor(Color.CYAN); status.setText("Warna biru dipilih"); });
+        small.setOnClickListener(v -> { annotationView.setSize(3); status.setText("Ukuran kecil"); });
+        medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
+        large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
+
+        FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(-1, dp(130), Gravity.BOTTOM);
+        barParams.bottomMargin = dp(2);
         annotationView = new AnnotationView(this);
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
-        // Put the drawing layer above the frozen image. The tool bar is brought
-        // to the very front so it remains clickable while annotation mode is active.
         cameraBox.addView(annotationView, cameraBox.indexOfChild(freezeView) + 1, overlayParams);
         annotationView.setMode(annotationMode);
         cameraBox.addView(annotationBar, barParams);
         annotationBar.bringToFront();
+    }
+
+    private void detectOcrOnFrozenImage() {
+        if (!frozen || frozenBitmap == null || annotationView == null) {
+            status.setText("Bekukan gambar dulu");
+            return;
+        }
+        Bitmap cropBitmap = getFrozenZoomedBitmap();
+        CropInfo crop = getCurrentCropInfo();
+        if (cropBitmap == null || crop == null) {
+            status.setText("Area gambar belum siap");
+            return;
+        }
+
+        status.setText("🔎 Mendeteksi tulisan...");
+        TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+        InputImage input = InputImage.fromBitmap(cropBitmap, 0);
+        recognizer.process(input)
+                .addOnSuccessListener(result -> {
+                    java.util.ArrayList<String> found = new java.util.ArrayList<>();
+                    int count = 0;
+                    for (Text.TextBlock block : result.getTextBlocks()) {
+                        for (Text.Line line : block.getLines()) {
+                            String value = line.getText() == null ? "" : line.getText().trim();
+                            if (value.isEmpty() || line.getBoundingBox() == null) continue;
+                            android.graphics.Rect r = line.getBoundingBox();
+                            float sx = (float) crop.width / Math.max(1, cropBitmap.getWidth());
+                            float sy = (float) crop.height / Math.max(1, cropBitmap.getHeight());
+                            float x1 = crop.left + r.left * sx;
+                            float y1 = crop.top + r.top * sy;
+                            float x2 = crop.left + r.right * sx;
+                            float y2 = crop.top + r.bottom * sy;
+                            annotationView.addOcr(x1, y1, x2, y2, value);
+                            found.add(value);
+                            count++;
+                        }
+                    }
+                    annotationView.invalidate();
+                    if (count == 0) {
+                        status.setText("OCR tidak menemukan tulisan");
+                        showOcrResultDialog(new java.util.ArrayList<String>());
+                    } else {
+                        status.setText("OCR menemukan " + count + " tulisan");
+                        showOcrResultDialog(found);
+                    }
+                    recognizer.close();
+                })
+                .addOnFailureListener(e -> {
+                    status.setText("OCR gagal • coba foto lebih terang/dekat");
+                    recognizer.close();
+                });
+    }
+
+    private void showOcrResultDialog(java.util.ArrayList<String> found) {
+        if (found.isEmpty()) return;
+        StringBuilder message = new StringBuilder();
+        for (int i = 0; i < found.size(); i++) {
+            message.append(i + 1).append(". ").append(found.get(i));
+            if (i < found.size() - 1) message.append("\n");
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("Hasil Deteksi OCR")
+                .setMessage(message.toString())
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Salin", (d, which) -> {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("OCR PCB", message.toString()));
+                        status.setText("Hasil OCR disalin");
+                    }
+                })
+                .show();
+    }
+
+    private void setAnnotationMode(AnnotationMode mode, String message) {
+        annotationMode = mode;
+        if (annotationView != null) annotationView.setMode(mode);
+        status.setText(message);
     }
 
     private void hideAnnotationTools() {
@@ -464,24 +574,43 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Bekukan gambar dulu");
             return;
         }
-
-        Bitmap base = getFrozenZoomedBitmap();
-        if (base == null) {
+        Bitmap result = buildAnnotatedBitmap();
+        if (result == null) {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
+        if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
+    }
 
+    private Bitmap buildAnnotatedBitmap() {
+        Bitmap base = getFrozenZoomedBitmap();
+        if (base == null) return null;
         Bitmap result = base.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(result);
 
-        float vw = Math.max(1f, annotationView.getWidth());
-        float vh = Math.max(1f, annotationView.getHeight());
-        float sx = result.getWidth() / vw;
-        float sy = result.getHeight() / vh;
+        CropInfo crop = getCurrentCropInfo();
+        if (crop == null) return result;
+        annotationView.drawAnnotationsToCrop(canvas, crop.left, crop.top, crop.width, crop.height,
+                result.getWidth(), result.getHeight());
+        return result;
+    }
 
-        annotationView.drawScaledAnnotations(canvas, sx, sy);
-        saveBitmap(result);
-        status.setText("PCB inspection tersimpan");
+    private static class CropInfo {
+        int left, top, width, height;
+        CropInfo(int l, int t, int w, int h) { left=l; top=t; width=w; height=h; }
+    }
+
+    private CropInfo getCurrentCropInfo() {
+        if (frozenBitmap == null) return null;
+        int w = frozenBitmap.getWidth(), h = frozenBitmap.getHeight();
+        float cropScale = 1f / frozenZoom;
+        int cw = Math.max(1, Math.min(w, Math.round(w * cropScale)));
+        int ch = Math.max(1, Math.min(h, Math.round(h * cropScale)));
+        float cx = w / 2f - frozenPanX / Math.max(1f, freezeView == null ? 1f : freezeView.getWidth()) * w;
+        float cy = h / 2f - frozenPanY / Math.max(1f, freezeView == null ? 1f : freezeView.getHeight()) * h;
+        int left = Math.max(0, Math.min(w - cw, Math.round(cx - cw / 2f)));
+        int top = Math.max(0, Math.min(h - ch, Math.round(cy - ch / 2f)));
+        return new CropInfo(left, top, cw, ch);
     }
 
     private void showTextInput(final float x, final float y) {
@@ -490,19 +619,17 @@ public class MainActivity extends AppCompatActivity {
         input.setHint("Contoh: VCC / jalur putus");
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.LTGRAY);
-
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("Tambah catatan")
                 .setView(input)
                 .setPositiveButton("Tambah", (d, which) -> {
                     String value = input.getText().toString().trim();
                     if (!value.isEmpty() && annotationView != null) {
-                        annotationView.addText(x, y, value);
+                        annotationView.addTextAtView(x, y, value);
                         status.setText("Catatan ditambahkan");
                     }
                 })
-                .setNegativeButton("Batal", null)
-                .create();
+                .setNegativeButton("Batal", null).create();
         dialog.setOnShowListener(d -> {
             input.requestFocus();
             input.postDelayed(() -> {
@@ -513,12 +640,31 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void shareAnnotatedFreeze() {
+        if (!frozen || frozenBitmap == null || annotationView == null) {
+            status.setText("Bekukan gambar dulu");
+            return;
+        }
+        Bitmap result = buildAnnotatedBitmap();
+        Uri uri = result == null ? null : saveBitmapToGallery(result);
+        if (uri == null) return;
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("image/jpeg");
+        intent.putExtra(Intent.EXTRA_STREAM, uri);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, "Bagikan hasil PCB"));
+    }
+
     private class AnnotationView extends View {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final java.util.ArrayList<Annotation> items = new java.util.ArrayList<>();
         private AnnotationMode mode = AnnotationMode.NONE;
         private float startX, startY, endX, endY;
         private boolean drawing = false;
+        private int currentColor = Color.RED;
+        private float strokeDp = 5f;
+        private Annotation selected;
+        private float lastSelectX, lastSelectY;
 
         AnnotationView(Context context) {
             super(context);
@@ -526,102 +672,136 @@ public class MainActivity extends AppCompatActivity {
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         }
 
-        void setMode(AnnotationMode m) { mode = m; drawing = false; invalidate(); }
+        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; invalidate(); }
+        void addOcr(float x1, float y1, float x2, float y2, String text) {
+            items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
+        }
+        void setColor(int color) { currentColor=color; invalidate(); }
+        void setSize(float size) { strokeDp=size; invalidate(); }
 
-        void undo() {
-            if (!items.isEmpty()) items.remove(items.size() - 1);
-            invalidate();
+        void undo() { if (!items.isEmpty()) items.remove(items.size()-1); selected=null; invalidate(); }
+        void clearAll() { items.clear(); selected=null; invalidate(); }
+
+        private float[] viewToSource(float x, float y) {
+            Matrix inv = new Matrix();
+            frozenMatrix.invert(inv);
+            float[] pts = new float[]{x,y};
+            inv.mapPoints(pts);
+            return pts;
         }
 
-        void clearAll() {
-            items.clear();
-            invalidate();
+        private float[] sourceToView(float x, float y) {
+            float[] pts = new float[]{x,y};
+            frozenMatrix.mapPoints(pts);
+            return pts;
         }
 
-        void addText(float x, float y, String text) {
-            items.add(Annotation.text(x, y, text));
+        void addTextAtView(float x, float y, String text) {
+            float[] p=viewToSource(x,y);
+            items.add(Annotation.text(p[0],p[1],text,currentColor,strokeDp));
             invalidate();
         }
 
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            drawAnnotations(canvas, 1f, 1f);
-            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER) {
-                drawOne(canvas, Annotation.shape(mode, startX, startY, endX, endY), 1f, 1f);
+            drawAnnotations(canvas);
+            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER && mode != AnnotationMode.SELECT) {
+                float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
+                drawOne(canvas, Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));
             }
         }
 
-        private void drawAnnotations(Canvas canvas, float sx, float sy) {
-            for (Annotation a : items) drawOne(canvas, a, sx, sy);
+        private void drawAnnotations(Canvas canvas) {
+            canvas.save();
+            canvas.concat(frozenMatrix);
+            for (Annotation a:items) drawOneSource(canvas,a);
+            canvas.restore();
         }
 
-        private void drawOne(Canvas canvas, Annotation a, float sx, float sy) {
-            paint.setColor(Color.RED);
+        private void drawOneSource(Canvas canvas, Annotation a) {
+            float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
+            paint.setColor(a.color);
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(dp(3) * Math.max(1f, Math.min(sx, sy)));
+            paint.setStrokeWidth(dp((int)a.size) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
             paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setTextSize(dp(18) * Math.max(1f, Math.min(sx, sy)));
+            paint.setTextSize(dp((int)(18 + a.size)) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
             paint.setTypeface(Typeface.DEFAULT_BOLD);
-
-            float x1=a.x1*sx, y1=a.y1*sy, x2=a.x2*sx, y2=a.y2*sy;
-            if (a.type == AnnotationMode.MARKER) {
+            if (a.type==AnnotationMode.MARKER) {
+                paint.setStyle(Paint.Style.FILL); canvas.drawCircle(a.x1,a.y1,dp((int)a.size),paint);
+            } else if (a.type==AnnotationMode.ARROW) {
+                canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
+                double ang=Math.atan2(a.y2-a.y1,a.x2-a.x1); float len=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang-.45),a.y2-len*(float)Math.sin(ang-.45),paint);
+                canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang+.45),a.y2-len*(float)Math.sin(ang+.45),paint);
+            } else if (a.type==AnnotationMode.CIRCLE) {
+                canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
+            } else if (a.type==AnnotationMode.TEXT) {
+                paint.setStyle(Paint.Style.FILL); paint.setShadowLayer(dp(3),1,1,Color.BLACK); canvas.drawText(a.text,a.x1,a.y1,paint); paint.clearShadowLayer();
+            } else if (a.type==AnnotationMode.OCR) {
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(dp(2) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                canvas.drawRect(new RectF(a.x1, a.y1, a.x2, a.y2), paint);
                 paint.setStyle(Paint.Style.FILL);
-                canvas.drawCircle(x1, y1, dp(7) * Math.max(1f, Math.min(sx, sy)), paint);
-            } else if (a.type == AnnotationMode.ARROW) {
-                canvas.drawLine(x1,y1,x2,y2,paint);
-                double ang=Math.atan2(y2-y1,x2-x1);
-                float len=dp(18)*Math.max(1f,Math.min(sx,sy));
-                canvas.drawLine(x2,y2,x2-len*(float)Math.cos(ang-0.45),y2-len*(float)Math.sin(ang-0.45),paint);
-                canvas.drawLine(x2,y2,x2-len*(float)Math.cos(ang+0.45),y2-len*(float)Math.sin(ang+0.45),paint);
-            } else if (a.type == AnnotationMode.CIRCLE) {
-                canvas.drawOval(new RectF(Math.min(x1,x2),Math.min(y1,y2),Math.max(x1,x2),Math.max(y1,y2)),paint);
-            } else if (a.type == AnnotationMode.TEXT) {
-                paint.setStyle(Paint.Style.FILL);
+                paint.setTextSize(dp(14) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
                 paint.setShadowLayer(dp(3), 1, 1, Color.BLACK);
-                canvas.drawText(a.text, x1, y1, paint);
+                canvas.drawText(a.text, a.x1, Math.max(a.y1 - dp(3) / Math.max(0.35f, frozenMatrix.mapRadius(1f)), a.y1), paint);
                 paint.clearShadowLayer();
             }
         }
 
-        void drawScaledAnnotations(Canvas canvas, float sx, float sy) {
-            drawAnnotations(canvas, sx, sy);
+        private void drawOne(Canvas canvas, Annotation a) { drawOneSource(canvas,a); }
+
+        void drawAnnotationsToCrop(Canvas canvas,int left,int top,int cw,int ch,int outW,int outH) {
+            canvas.save();
+            float sx=(float)outW/cw, sy=(float)outH/ch;
+            canvas.scale(sx,sy); canvas.translate(-left,-top);
+            for (Annotation a:items) drawOneSource(canvas,a);
+            canvas.restore();
+        }
+
+        private Annotation hitTest(float vx,float vy) {
+            float[] p=viewToSource(vx,vy);
+            float tolerance=dp(24)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+            for (int i=items.size()-1;i>=0;i--) {
+                Annotation a=items.get(i);
+                float minX=Math.min(a.x1,a.x2)-tolerance, maxX=Math.max(a.x1,a.x2)+tolerance;
+                float minY=Math.min(a.y1,a.y2)-tolerance, maxY=Math.max(a.y1,a.y2)+tolerance;
+                if (a.type==AnnotationMode.MARKER || a.type==AnnotationMode.TEXT) { minX=a.x1-tolerance;maxX=a.x1+tolerance;minY=a.y1-tolerance;maxY=a.y1+tolerance; }
+                if (p[0]>=minX && p[0]<=maxX && p[1]>=minY && p[1]<=maxY) return a;
+            }
+            return null;
         }
 
         @Override public boolean onTouchEvent(MotionEvent e) {
-            if (!frozen || mode == AnnotationMode.NONE) return false;
+            if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
-            if (mode == AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) {
-                showTextInput(x,y);
+            if (mode==AnnotationMode.SELECT) {
+                switch(e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN: selected=hitTest(x,y); lastSelectX=x; lastSelectY=y; return true;
+                    case MotionEvent.ACTION_MOVE:
+                        if (selected!=null) { float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y); float dx=p2[0]-p1[0],dy=p2[1]-p1[1]; selected.x1+=dx;selected.y1+=dy;selected.x2+=dx;selected.y2+=dy; lastSelectX=x;lastSelectY=y;invalidate(); } return true;
+                    case MotionEvent.ACTION_UP: selected=null; return true;
+                }
                 return true;
             }
-            if (mode == AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) {
-                items.add(Annotation.marker(x,y));
-                invalidate();
-                return true;
-            }
-            switch (e.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    startX=x; startY=y; endX=x; endY=y; drawing=true; return true;
-                case MotionEvent.ACTION_MOVE:
-                    endX=x; endY=y; invalidate(); return true;
+            if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
+            if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
+            switch(e.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN: startX=x;startY=y;endX=x;endY=y;drawing=true;return true;
+                case MotionEvent.ACTION_MOVE: endX=x;endY=y;invalidate();return true;
                 case MotionEvent.ACTION_UP:
-                    endX=x; endY=y;
-                    if (drawing) items.add(Annotation.shape(mode,startX,startY,endX,endY));
-                    drawing=false; invalidate(); return true;
+                    endX=x;endY=y; if(drawing){float[] a=viewToSource(startX,startY),b=viewToSource(endX,endY);items.add(Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));} drawing=false;invalidate();return true;
             }
             return true;
         }
     }
 
     private static class Annotation {
-        AnnotationMode type;
-        float x1,y1,x2,y2;
-        String text;
-        static Annotation marker(float x,float y){ return shape(AnnotationMode.MARKER,x,y,x,y); }
-        static Annotation text(float x,float y,String t){ Annotation a=marker(x,y); a.type=AnnotationMode.TEXT; a.text=t; return a; }
-        static Annotation shape(AnnotationMode m,float x1,float y1,float x2,float y2){
-            Annotation a=new Annotation(); a.type=m; a.x1=x1; a.y1=y1; a.x2=x2; a.y2=y2; return a;
-        }
+        AnnotationMode type; float x1,y1,x2,y2; String text; int color=Color.RED; float size=5f;
+        static Annotation marker(float x,float y,int c,float s){return shape(AnnotationMode.MARKER,x,y,x,y,c,s);}
+        static Annotation text(float x,float y,String t,int c,float s){Annotation a=marker(x,y,c,s);a.type=AnnotationMode.TEXT;a.text=t;return a;}
+        static Annotation ocr(float x1,float y1,float x2,float y2,String t,int c,float s){Annotation a=shape(AnnotationMode.OCR,x1,y1,x2,y2,c,s);a.text=t;return a;}
+        static Annotation shape(AnnotationMode m,float x1,float y1,float x2,float y2,int c,float s){Annotation a=new Annotation();a.type=m;a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.color=c;a.size=s;return a;}
     }
 
     private void applySystemBarInsets() {
@@ -751,6 +931,17 @@ public class MainActivity extends AppCompatActivity {
             freezeView.setImageBitmap(frozenBitmap);
             freezeView.setScaleType(ImageView.ScaleType.MATRIX);
             freezeView.setBackgroundColor(Color.BLACK);
+            freezeView.setOnTouchListener((v, event) -> {
+                if (!frozen || annotationMode != AnnotationMode.NONE) return false;
+                frozenScaleDetector.onTouchEvent(event);
+                if (event.getPointerCount() == 1) {
+                    switch (event.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN: lastTouchX=event.getX(); lastTouchY=event.getY(); return true;
+                        case MotionEvent.ACTION_MOVE: frozenPanX += event.getX()-lastTouchX; frozenPanY += event.getY()-lastTouchY; lastTouchX=event.getX(); lastTouchY=event.getY(); updateFrozenImage(); return true;
+                    }
+                }
+                return true;
+            });
             FrameLayout parent = (FrameLayout) preview.getParent();
             parent.addView(freezeView, new FrameLayout.LayoutParams(-1, -1));
             frozen = true;
@@ -828,44 +1019,34 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap getFrozenZoomedBitmap() {
-        if (frozenBitmap == null) return null;
-        int w = frozenBitmap.getWidth();
-        int h = frozenBitmap.getHeight();
-        float cropScale = 1f / frozenZoom;
-        int cropW = Math.max(1, Math.min(w, Math.round(w * cropScale)));
-        int cropH = Math.max(1, Math.min(h, Math.round(h * cropScale)));
-        float cx = w / 2f - frozenPanX / Math.max(1f, freezeView == null ? 1f : freezeView.getWidth()) * w;
-        float cy = h / 2f - frozenPanY / Math.max(1f, freezeView == null ? 1f : freezeView.getHeight()) * h;
-        int left = Math.max(0, Math.min(w - cropW, Math.round(cx - cropW / 2f)));
-        int top = Math.max(0, Math.min(h - cropH, Math.round(cy - cropH / 2f)));
-        return Bitmap.createBitmap(frozenBitmap, left, top, cropW, cropH);
+        CropInfo crop = getCurrentCropInfo();
+        if (crop == null) return null;
+        return Bitmap.createBitmap(frozenBitmap, crop.left, crop.top, crop.width, crop.height);
     }
 
     private void saveBitmap(Bitmap bitmap) {
+        Uri uri = saveBitmapToGallery(bitmap);
+        if (uri != null) status.setText("Foto tersimpan • Jejak Teknisi");
+    }
+
+    private Uri saveBitmapToGallery(Bitmap bitmap) {
+        if (bitmap == null) return null;
         try {
             String name = "JejakTeknisi_" + System.currentTimeMillis() + ".jpg";
             ContentValues values = new ContentValues();
             values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
             values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
             values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
-
-            Uri uri = getContentResolver().insert(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-            if (uri == null) {
-                status.setText("Gagal menyimpan foto");
-                return;
-            }
-
+            Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) { status.setText("Gagal menyimpan foto"); return null; }
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
                 if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 98, out)) {
-                    status.setText("Gagal menyimpan foto");
-                    return;
+                    status.setText("Gagal menyimpan foto"); return null;
                 }
             }
-            status.setText("Foto tersimpan • Jejak Teknisi");
+            return uri;
         } catch (Exception e) {
-            status.setText("Gagal menyimpan foto");
-            e.printStackTrace();
+            status.setText("Gagal menyimpan foto"); e.printStackTrace(); return null;
         }
     }
 
