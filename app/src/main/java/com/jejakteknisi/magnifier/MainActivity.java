@@ -170,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.5");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V2.5.1");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -437,13 +437,14 @@ public class MainActivity extends AppCompatActivity {
         FrameLayout.LayoutParams barParams = new FrameLayout.LayoutParams(
                 -1, -2, Gravity.BOTTOM);
         barParams.bottomMargin = dp(4);
-        cameraBox.addView(annotationBar, barParams);
-
         annotationView = new AnnotationView(this);
         FrameLayout.LayoutParams overlayParams = new FrameLayout.LayoutParams(-1, -1);
-        // Annotation view must be above the frozen image but below the tool bar.
+        // Put the drawing layer above the frozen image. The tool bar is brought
+        // to the very front so it remains clickable while annotation mode is active.
         cameraBox.addView(annotationView, cameraBox.indexOfChild(freezeView) + 1, overlayParams);
         annotationView.setMode(annotationMode);
+        cameraBox.addView(annotationBar, barParams);
+        annotationBar.bringToFront();
     }
 
     private void hideAnnotationTools() {
@@ -758,8 +759,9 @@ public class MainActivity extends AppCompatActivity {
             frozenPanY = 0f;
             zoomBar.setProgress(0);
             updateFrozenImage();
+            showAnnotationTools();
             freezeBtn.setText("▶️\nLIVE");
-            status.setText("❄️ BEKU • zoom + geser gambar • FOTO untuk simpan");
+            status.setText("❄️ BEKU • pilih alat untuk menandai PCB");
         } else {
             hideAnnotationTools();
             frozenBitmap = null;
