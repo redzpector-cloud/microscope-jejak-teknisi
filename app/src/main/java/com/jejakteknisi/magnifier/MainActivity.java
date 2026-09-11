@@ -20,6 +20,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.ScrollView;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.ScaleGestureDetector;
@@ -100,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
     private Button cameraFocusBtn;
     private Button cameraPlusBtn;
     private Button overlayBtn;
+    private Button guideBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
 
@@ -116,7 +118,7 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout cameraBox;
     private AnnotationView annotationView;
     private LinearLayout annotationBar;
-    private enum AnnotationMode { NONE, SELECT, MARKER, ARROW, CIRCLE, TEXT, OCR }
+    private enum AnnotationMode { NONE, SELECT, MARKER, ARROW, CIRCLE, TEXT, OCR, JUMPER }
     private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
@@ -196,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.0");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.1");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -214,7 +216,11 @@ public class MainActivity extends AppCompatActivity {
 
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(13);
-        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(92), dp(58)));
+        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
+
+        guideBtn = makeButton("❓\nPanduan");
+        guideBtn.setTextSize(11);
+        top.addView(guideBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
 
         root.addView(top);
 
@@ -305,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
         photoBtn = makeButton("📸\nFOTO");
         Button focus = makeButton("🎯\nFokus");
         cameraFocusBtn = focus;
-        overlayBtn = makeButton("🎯\nGrid");
+        overlayBtn = makeButton("🔧\nJumper");
         overlayBtn.setTextSize(11);
         Button plus = makeButton("+");
         cameraPlusBtn = plus;
@@ -383,7 +389,13 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         photoBtn.setOnClickListener(v -> takePhoto());
-        overlayBtn.setOnClickListener(v -> showOverlaySettings());
+        overlayBtn.setOnClickListener(v -> {
+            if (!frozen) toggleFreeze();
+            if (frozen && annotationView != null) {
+                setAnnotationMode(AnnotationMode.JUMPER, "🔧 Mode Jumper aktif • tarik titik A → B");
+            }
+        });
+        guideBtn.setOnClickListener(v -> showUserGuide());
 
         preview.setOnTouchListener((v, event) -> {
             if (frozen) {
@@ -444,6 +456,7 @@ public class MainActivity extends AppCompatActivity {
         Button arrow = makeButton("➜\nPanah");
         Button circle = makeButton("○\nLingkar");
         Button text = makeButton("T\nTeks");
+        Button jumper = makeButton("🔧\nJumper");
         Button ocr = makeButton("🔎\nOCR");
         Button undo = makeButton("↩\nUndo");
         Button redo = makeButton("↪\nRedo");
@@ -453,7 +466,7 @@ public class MainActivity extends AppCompatActivity {
         Button save = makeButton("💾\nSimpan");
         Button share = makeButton("↗\nShare");
 
-        Button[] row1 = {pan, select, marker, arrow, circle, text};
+        Button[] row1 = {pan, select, marker, arrow, circle, text, jumper};
         for (Button b : row1) {
             b.setTextSize(10);
             toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
@@ -473,6 +486,7 @@ public class MainActivity extends AppCompatActivity {
         Button large = makeButton("L");
         TextView legend = makeInfoText("Warna / Ukuran • 2 jari = putar");
         legend.setTextSize(10);
+        legend.setText("Jumper: tarik titik A → B • 2 jari = putar/ubah ukuran");
 
         Button[] opts = {red, yellow, green, blue, small, medium, large};
         optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.7f));
@@ -487,6 +501,7 @@ public class MainActivity extends AppCompatActivity {
         arrow.setOnClickListener(v -> setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"));
         circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"));
         text.setOnClickListener(v -> setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"));
+        jumper.setOnClickListener(v -> setAnnotationMode(AnnotationMode.JUMPER, "Mode Jumper aktif • tarik dari titik A ke titik B"));
         select.setOnClickListener(v -> setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • 2 jari untuk putar"));
         ocr.setOnClickListener(v -> detectOcrOnFrozenImage());
         undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
@@ -522,6 +537,91 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(92));
         rootLayout.addView(annotationBar, exposureIndex, barParams);
+    }
+
+    private void showJumperQuickGuide() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8), dp(4), dp(8), dp(4));
+        TextView t = new TextView(this);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(15);
+        t.setPadding(0, dp(4), 0, dp(8));
+        t.setText("MODE JUMPER\n\n" +
+                "1. Tekan Beku untuk menghentikan gambar.\n" +
+                "2. Tekan 🔧 Jumper.\n" +
+                "3. Tarik dari titik A ke titik B pada jalur PCB.\n" +
+                "4. Gunakan Pilih untuk memindahkan atau memutar jumper.\n" +
+                "5. Gunakan Simpan untuk menyimpan hasil.\n\n" +
+                "Tips: zoom dulu agar titik jumper lebih presisi.");
+        box.addView(t);
+        new AlertDialog.Builder(this).setTitle("Jejak Teknisi • Mode Jumper")
+                .setView(box).setPositiveButton("Mulai", (d,w)->{
+                    if (frozen && annotationView != null) setAnnotationMode(AnnotationMode.JUMPER, "Mode Jumper aktif • tarik titik A → B");
+                    else status.setText("Beku gambar dulu untuk Mode Jumper");
+                }).setNegativeButton("Tutup", null).show();
+    }
+
+    private void showUserGuide() {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(6), dp(2), dp(6), dp(2));
+        TextView guide = new TextView(this);
+        guide.setTextColor(Color.WHITE);
+        guide.setTextSize(14);
+        guide.setLineSpacing(0, 1.08f);
+        guide.setText(
+                "PANDUAN JEJAK TEKNISI MICROSCOPE V3.1\n\n" +
+                "1. KAMERA LIVE\n" +
+                "• Kamera: tampilan microscope LIVE.\n" +
+                "• Fokus: fokus di tengah layar. Tap gambar untuk fokus di titik tertentu.\n" +
+                "• Lampu: nyalakan/matikan torch jika didukung perangkat.\n" +
+                "• − / +: atur zoom kamera.\n" +
+                "• Zoom bar: geser untuk memilih tingkat zoom.\n" +
+                "• Exposure: atur terang/gelap. AUTO mengembalikan exposure normal.\n" +
+                "• Detail: aktifkan tampilan kualitas/detail tinggi.\n\n" +
+                "2. BEKU / FREEZE\n" +
+                "• Tekan Beku untuk mengambil tampilan saat itu dan masuk mode inspeksi.\n" +
+                "• Pada Freeze, gambar dapat digeser dan dizoom dengan 1–2 jari.\n" +
+                "• Tekan LIVE untuk kembali ke kamera.\n\n" +
+                "3. EDIT & TANDAI PCB\n" +
+                "• Geser: pindahkan tampilan gambar.\n" +
+                "• Pilih: pilih objek lalu geser, putar, atau ubah ukuran dengan 2 jari.\n" +
+                "• Titik: tandai satu titik komponen/jalur.\n" +
+                "• Panah: tarik panah ke area yang ingin ditunjukkan.\n" +
+                "• Lingkar: lingkari IC, komponen, atau area PCB.\n" +
+                "• Teks: tambahkan catatan seperti VCC, GND, atau nama jalur.\n" +
+                "• Edit: ubah teks yang sedang dipilih.\n" +
+                "• Duplikat: gandakan objek terpilih.\n" +
+                "• Hapus: hapus semua anotasi.\n\n" +
+                "4. MODE JUMPER 🔧\n" +
+                "• Tekan Jumper, lalu tarik dari titik A ke titik B.\n" +
+                "• Titik A dan B diberi penanda agar jalur jumper jelas.\n" +
+                "• Pilih objek untuk memindahkan, memutar, atau mengubah ukurannya.\n" +
+                "• Cocok untuk menandai jalur putus, jumper resistor, konektor, dan IC.\n\n" +
+                "5. OCR\n" +
+                "• OCR membaca tulisan yang terlihat pada gambar Freeze.\n" +
+                "• Hasil dapat disalin dari dialog OCR.\n\n" +
+                "6. WARNA & UKURAN\n" +
+                "• Pilih warna untuk objek yang dipilih atau objek baru.\n" +
+                "• S/M/L mengubah ketebalan/ukuran objek.\n\n" +
+                "7. UNDO / REDO\n" +
+                "• Undo membatalkan perubahan terakhir.\n" +
+                "• Redo mengembalikan perubahan yang dibatalkan.\n\n" +
+                "8. SIMPAN & SHARE\n" +
+                "• Simpan menyimpan hasil anotasi ke galeri.\n" +
+                "• Share menyimpan hasil lalu membuka pilihan aplikasi untuk berbagi.\n\n" +
+                "9. CROSSHAIR + GRID\n" +
+                "• Crosshair membantu menentukan titik tengah/posisi.\n" +
+                "• Grid membantu melihat jarak dan posisi komponen.\n\n" +
+                "ALUR KERJA TEKNISI\n" +
+                "LIVE → Zoom/Fokus → Beku → Jumper/Panah/Titik/Teks → Pilih/Edit → OCR (opsional) → Simpan/Share → LIVE"
+        );
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(guide);
+        box.addView(scroll, new LinearLayout.LayoutParams(-1, dp(500)));
+        new AlertDialog.Builder(this).setTitle("Panduan Pengguna")
+                .setView(box).setPositiveButton("Selesai", null).show();
     }
 
     private void detectOcrOnFrozenImage() {
@@ -946,6 +1046,27 @@ public class MainActivity extends AppCompatActivity {
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang-.45),a.y2-len*(float)Math.sin(ang-.45),paint);
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang+.45),a.y2-len*(float)Math.sin(ang+.45),paint);
                 canvas.restore();
+            } else if (a.type==AnnotationMode.JUMPER) {
+                canvas.save();
+                float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                canvas.rotate(a.rotation, cx, cy);
+                canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
+                paint.setStyle(Paint.Style.FILL);
+                float rr=dp(5)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                canvas.drawCircle(a.x1,a.y1,rr,paint);
+                canvas.drawCircle(a.x2,a.y2,rr,paint);
+                paint.setStyle(Paint.Style.STROKE);
+                float midX=(a.x1+a.x2)/2f, midY=(a.y1+a.y2)/2f;
+                float boxW=dp(34)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                float boxH=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Color.argb(190,0,0,0));
+                canvas.drawRoundRect(new RectF(midX-boxW/2, midY-boxH/2, midX+boxW/2, midY+boxH/2), boxH/2, boxH/2, paint);
+                paint.setColor(a.color);
+                paint.setTextSize(dp(10)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                paint.setTypeface(Typeface.DEFAULT_BOLD);
+                canvas.drawText("JMP", midX-paint.measureText("JMP")/2f, midY+paint.getTextSize()/3f, paint);
+                canvas.restore();
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.TEXT) {
@@ -990,7 +1111,13 @@ public class MainActivity extends AppCompatActivity {
             float tolerance=dp(28)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
             for (int i=items.size()-1;i>=0;i--) {
                 Annotation a=items.get(i);
-                if (a.type==AnnotationMode.ARROW) {
+                if (a.type==AnnotationMode.JUMPER) {
+                    float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                    double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
+                    float rx=(float)(cx+(p[0]-cx)*cs-(p[1]-cy)*sn);
+                    float ry=(float)(cy+(p[0]-cx)*sn+(p[1]-cy)*cs);
+                    if (distancePointToSegment(rx,ry,a.x1,a.y1,a.x2,a.y2)<=tolerance*1.4f) return a;
+                } else if (a.type==AnnotationMode.ARROW) {
                     // Test against the actual rotated shaft.
                     float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
