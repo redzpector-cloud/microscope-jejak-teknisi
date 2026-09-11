@@ -1690,29 +1690,53 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void sendToGoogleLens(Uri uri) {
-        if (uri == null) {
-            status.setText("Foto tidak tersedia");
+    private void sendToGoogleLens(Uri imageUri) {
+        // Jangan gunakan ACTION_SEND karena itu membuka Android Share Sheet.
+        // Gunakan deep-link Google Lens agar foto langsung masuk ke Lens.
+        if (imageUri == null) {
+            status.setText("Foto belum siap untuk Google Lens");
             return;
         }
 
-        // Jangan pernah menampilkan Android Share/Intent Resolver.
-        // Hanya kirim ke Google Lens jika Google app tersedia.
-        Intent lensIntent = new Intent(Intent.ACTION_SEND);
-        lensIntent.setType("image/jpeg");
-        lensIntent.putExtra(Intent.EXTRA_STREAM, uri);
-        lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        lensIntent.setPackage("com.google.android.googlequicksearchbox");
+        final String googlePackage = "com.google.android.googlequicksearchbox";
+        final String[] schemes = {"googleapp", "google"};
 
+        for (String scheme : schemes) {
+            try {
+                Uri lensUri = Uri.parse(scheme + "://lens")
+                        .buildUpon()
+                        .appendQueryParameter("LensBitmapUriKey", imageUri.toString())
+                        .build();
+
+                getContentResolver().grantUriPermission(
+                        googlePackage, imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                Intent lensIntent = new Intent(Intent.ACTION_VIEW, lensUri);
+                lensIntent.setPackage(googlePackage);
+                lensIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                if (lensIntent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(lensIntent);
+                    return;
+                }
+            } catch (Exception ignored) {
+                // Coba kontrak Lens berikutnya.
+            }
+        }
+
+        // Fallback untuk perangkat yang memasang Google Lens sebagai aplikasi
+        // terpisah. Jangan pernah membuka Share Sheet.
         try {
-            if (lensIntent.resolveActivity(getPackageManager()) == null) {
-                status.setText("Google Lens tidak tersedia di HP ini");
+            Intent standaloneLens = getPackageManager()
+                    .getLaunchIntentForPackage("com.google.ar.lens");
+            if (standaloneLens != null) {
+                startActivity(standaloneLens);
                 return;
             }
-            startActivity(lensIntent);
-        } catch (ActivityNotFoundException | SecurityException e) {
-            status.setText("Google Lens tidak dapat dibuka");
+        } catch (Exception ignored) {
         }
+
+        status.setText("Google Lens belum tersedia. Instal/perbarui aplikasi Google atau Google Lens.");
     }
 
     @Override
