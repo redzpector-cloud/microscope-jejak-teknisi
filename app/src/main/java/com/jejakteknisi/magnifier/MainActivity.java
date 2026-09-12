@@ -88,6 +88,11 @@ public class MainActivity extends AppCompatActivity {
     private float lastTouchY;
     private boolean movingFrozen = false;
     private ScaleGestureDetector frozenScaleDetector;
+    private ScaleGestureDetector liveScaleDetector;
+    private boolean livePinching = false;
+    private float liveLastScale = 1f;
+    private float liveDownX = 0f;
+    private float liveDownY = 0f;
     private final Matrix frozenMatrix = new Matrix();
     private Button detailBtn;
     private Button galleryBtn;
@@ -345,6 +350,33 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        liveScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScaleBegin(ScaleGestureDetector detector) {
+                livePinching = true;
+                return true;
+            }
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                if (frozen || camera == null) return false;
+                if (camera.getCameraInfo().getZoomState().getValue() == null) return false;
+                float factor = detector.getScaleFactor();
+                if (!Float.isFinite(factor) || factor <= 0f) return false;
+                liveLastScale = factor;
+                float current = camera.getCameraInfo().getZoomState().getValue().getZoomRatio();
+                float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
+                float newZoom = Math.max(1f, Math.min(max, current * factor));
+                camera.getCameraControl().setZoomRatio(newZoom);
+                if (zoomBar != null && max > 1f) {
+                    zoomBar.setProgress((int)(((newZoom - 1f) / (max - 1f)) * 100f));
+                }
+                updateZoomText();
+                return true;
+            }
+            @Override public void onScaleEnd(ScaleGestureDetector detector) {
+                livePinching = false;
+                liveLastScale = 1f;
+            }
+        });
+
         zoomBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -427,8 +459,30 @@ public class MainActivity extends AppCompatActivity {
                 }
                 return true;
             }
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                focusAt(event.getX(), event.getY());
+
+            // LIVE: pinch with two fingers for smooth optical/digital zoom.
+            liveScaleDetector.onTouchEvent(event);
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    liveDownX = event.getX();
+                    liveDownY = event.getY();
+                    livePinching = false;
+                    return true;
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    livePinching = true;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (event.getPointerCount() > 1) livePinching = true;
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    if (!livePinching && Math.hypot(event.getX() - liveDownX, event.getY() - liveDownY) <= dp(18)) {
+                        focusAt(event.getX(), event.getY());
+                    }
+                    livePinching = false;
+                    return true;
+                case MotionEvent.ACTION_CANCEL:
+                    livePinching = false;
+                    return true;
             }
             return true;
         });
@@ -972,6 +1026,8 @@ public class MainActivity extends AppCompatActivity {
 
     private class OverlayView extends View {
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private float focusX = -1f, focusY = -1f;
+        private long focusUntil = 0L;
         OverlayView(Context context) {
             super(context);
             setBackgroundColor(Color.TRANSPARENT);
@@ -1004,6 +1060,21 @@ public class MainActivity extends AppCompatActivity {
                 p.setStyle(Paint.Style.FILL);
                 canvas.drawCircle(cx,cy,dp(3),p);
             }
+            if (focusX >= 0f && focusY >= 0f && System.currentTimeMillis() < focusUntil) {
+                float pulse = dp(22) + dp(5) * (float)Math.sin((focusUntil - System.currentTimeMillis()) / 90.0);
+                p.setStyle(Paint.Style.STROKE);
+                p.setStrokeWidth(dp(2));
+                p.setColor(Color.YELLOW);
+                canvas.drawCircle(focusX, focusY, pulse, p);
+                canvas.drawLine(focusX-dp(32),focusY,focusX-dp(18),focusY,p);
+                canvas.drawLine(focusX+dp(18),focusY,focusX+dp(32),focusY,p);
+                canvas.drawLine(focusX,focusY-dp(32),focusX,focusY-dp(18),p);
+                canvas.drawLine(focusX,focusY+dp(18),focusX,focusY+dp(32),p);
+                postInvalidateDelayed(50);
+            }
+        }
+        void showFocus(float x, float y) {
+            focusX = x; focusY = y; focusUntil = System.currentTimeMillis() + 900L; invalidate();
         }
         void refresh(){ invalidate(); }
     }
@@ -1815,15 +1886,19 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        x = Math.max(0f, Math.min(preview.getWidth(), x));
+        y = Math.max(0f, Math.min(preview.getHeight(), y));
+        if (overlayView != null) overlayView.showFocus(x, y);
+
         MeteringPoint point = preview.getMeteringPointFactory().createPoint(x, y);
 
         FocusMeteringAction action =
                 new FocusMeteringAction.Builder(
                         point,
-                        FocusMeteringAction.FLAG_AF
-                ).build();
+                        FocusMeteringAction.FLAG_AF | FocusMeteringAction.FLAG_AE
+                ).setAutoCancelDuration(3, java.util.concurrent.TimeUnit.SECONDS).build();
 
-        status.setText("Fokus...");
+        status.setText("Fokus area...");
         camera.getCameraControl().startFocusAndMetering(action)
                 .addListener(() -> status.setText("Fokus siap"),
                         ContextCompat.getMainExecutor(this));
