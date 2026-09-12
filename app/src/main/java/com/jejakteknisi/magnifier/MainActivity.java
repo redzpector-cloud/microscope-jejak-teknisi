@@ -35,6 +35,12 @@ import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.ScrollView;
+import android.widget.Toast;
+import android.speech.RecognizerIntent;
+import android.speech.SpeechRecognizer;
+import java.util.Locale;
 import android.content.Context;
 import java.util.ArrayList;
 
@@ -69,6 +75,11 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
     private static final int GALLERY_PICK = 101;
+    private static final int AUDIO_PERMISSION = 8;
+    private static final int EMMC_VOICE = 102;
+    private Button emmcDbBtn;
+    private SpeechRecognizer speechRecognizer;
+    private AlertDialog emmcDialog;
 
     private PreviewView preview;
     private ImageCapture capture;
@@ -244,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(13);
         top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
-
+\n        emmcDbBtn = makeButton("💾\neMMC DB");\n        emmcDbBtn.setTextSize(11);\n        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));\n
         root.addView(top);
 
         cameraBox = new FrameLayout(this);
@@ -420,7 +431,7 @@ public class MainActivity extends AppCompatActivity {
 
         autoExposureBtn.setOnClickListener(v -> setExposure(0));
         galleryBtn.setOnClickListener(v -> openGallery());
-
+        emmcDbBtn.setOnClickListener(v -> showEmmcDatabase());\n
         detailBtn.setOnClickListener(v -> {
             detailOn = !detailOn;
             detailBtn.setText(detailOn ? "ULTRA\nDETAIL" : "DETAIL\nNORMAL");
@@ -2350,6 +2361,221 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
+    // ========================= eMMC DATABASE V1 =========================
+    private void showEmmcDatabase() {
+        if (emmcDialog != null && emmcDialog.isShowing()) return;
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(8), dp(16), dp(4));
+        box.setBackgroundColor(Color.rgb(12, 15, 17));
+
+        TextView hint = makeInfoText("Cari part number eMMC");
+        hint.setGravity(Gravity.START);
+        hint.setTextSize(13);
+        box.addView(hint, new LinearLayout.LayoutParams(-1, dp(28)));
+
+        EditText code = new EditText(this);
+        code.setHint("Contoh: KLM8G1GETF-B041");
+        code.setSingleLine(true);
+        code.setTextColor(Color.WHITE);
+        code.setHintTextColor(Color.LTGRAY);
+        code.setTextSize(16);
+        code.setPadding(dp(10), 0, dp(10), 0);
+        code.setBackgroundColor(Color.rgb(35, 40, 44));
+        box.addView(code, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER);
+        buttons.setPadding(0, dp(8), 0, dp(4));
+
+        Button search = makeButton("🔎\nCARI");
+        Button voice = makeButton("🎙\nVOICE");
+        Button scan = makeButton("📸\nSCAN OCR");
+        buttons.addView(search, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        buttons.addView(voice, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        buttons.addView(scan, new LinearLayout.LayoutParams(0, dp(58), 1f));
+        box.addView(buttons);
+
+        TextView result = new TextView(this);
+        result.setTextColor(Color.WHITE);
+        result.setTextSize(14);
+        result.setPadding(dp(10), dp(12), dp(10), dp(12));
+        result.setGravity(Gravity.START);
+        result.setText("Belum ada pencarian.");
+        result.setBackgroundColor(Color.rgb(24, 28, 31));
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(result);
+        box.addView(scroll, new LinearLayout.LayoutParams(-1, dp(190)));
+
+        TextView footer = new TextView(this);
+        footer.setText("Offline • Database lokal • Foto OCR tidak disimpan ke Galeri");
+        footer.setTextColor(Color.LTGRAY);
+        footer.setTextSize(11);
+        footer.setPadding(dp(4), dp(8), dp(4), dp(2));
+        box.addView(footer);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle("eMMC DATABASE • V1")
+                .setView(box)
+                .setNegativeButton("Tutup", null)
+                .create();
+        emmcDialog = dialog;
+
+        search.setOnClickListener(v -> searchEmmc(code.getText().toString(), result));
+        voice.setOnClickListener(v -> startEmmcVoice(code));
+        scan.setOnClickListener(v -> scanEmmcOcr(code, result));
+        dialog.setOnShowListener(d -> {
+            dialog.getWindow().setLayout(-1, -2);
+        });
+        dialog.show();
+    }
+
+    private void searchEmmc(String raw, TextView result) {
+        String query = normalizeEmmc(raw);
+        if (query.isEmpty()) {
+            result.setText("Masukkan kode/part number eMMC terlebih dahulu.");
+            return;
+        }
+        String found = findEmmcInAsset(query);
+        if (found == null) {
+            result.setText("KODE: " + query + "\\n\\nTidak ditemukan di database offline.\\n\\nGunakan SCAN OCR untuk membaca ulang, atau tambahkan data ke database/emmc_database.csv.");
+        } else {
+            result.setText(found);
+        }
+    }
+
+    private String normalizeEmmc(String text) {
+        return text == null ? "" : text.trim().replaceAll("\\s+", "").toUpperCase(Locale.US);
+    }
+
+    private String findEmmcInAsset(String query) {
+        try (java.io.InputStream in = getAssets().open("emmc_database.csv");
+             java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(in))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty() || line.startsWith("#")) continue;
+                String[] p = line.split(",", -1);
+                if (p.length < 5) continue;
+                String part = normalizeEmmc(p[0]);
+                if (query.equals(part) || query.contains(part) || part.contains(query)) {
+                    return "eMMC DITEMUKAN\\n\\n"
+                            + "Part Number : " + p[0] + "\\n"
+                            + "Brand       : " + p[1] + "\\n"
+                            + "Kapasitas   : " + p[2] + "\\n"
+                            + "Grade       : " + p[3] + "\\n"
+                            + "Catatan     : " + p[4];
+                }
+            }
+        } catch (Exception e) {
+            return "Database gagal dibaca: " + e.getMessage();
+        }
+        return null;
+    }
+
+    private void startEmmcVoice(EditText target) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Voice recognition tidak tersedia di HP ini.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, AUDIO_PERMISSION);
+            Toast.makeText(this, "Izinkan mikrofon, lalu tekan VOICE lagi.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (speechRecognizer != null) {
+            try { speechRecognizer.destroy(); } catch (Exception ignored) {}
+        }
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+        speechRecognizer.setRecognitionListener(new android.speech.RecognitionListener() {
+            @Override public void onReadyForSpeech(Bundle params) { status.setText("VOICE eMMC • sebutkan kode..."); }
+            @Override public void onBeginningOfSpeech() {}
+            @Override public void onRmsChanged(float rmsdB) {}
+            @Override public void onBufferReceived(byte[] buffer) {}
+            @Override public void onEndOfSpeech() { status.setText("VOICE eMMC • memproses..."); }
+            @Override public void onError(int error) { status.setText("VOICE eMMC • tidak terbaca"); }
+            @Override public void onResults(Bundle results) {
+                ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
+                if (list != null && !list.isEmpty()) {
+                    target.setText(list.get(0).toUpperCase(Locale.US).replaceAll("\\s+", ""));
+                    status.setText("VOICE eMMC • kode diterima");
+                }
+            }
+            @Override public void onPartialResults(Bundle partialResults) {}
+            @Override public void onEvent(int eventType, Bundle params) {}
+        });
+        Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sebutkan kode eMMC");
+        speechRecognizer.startListening(intent);
+    }
+
+    private void scanEmmcOcr(EditText target, TextView result) {
+        if (capture == null) {
+            result.setText("Kamera belum siap.");
+            return;
+        }
+        result.setText("Memotret eMMC untuk OCR...\\nFoto hanya dipakai sementara dan tidak disimpan ke Galeri.");
+        java.io.File file = new java.io.File(getCacheDir(), "emmc_ocr_" + System.currentTimeMillis() + ".jpg");
+        ImageCapture.OutputFileOptions options =
+                new ImageCapture.OutputFileOptions.Builder(file).build();
+
+        capture.takePicture(options, ContextCompat.getMainExecutor(this),
+                new ImageCapture.OnImageSavedCallback() {
+                    @Override public void onImageSaved(@NonNull ImageCapture.OutputFileResults outputFileResults) {
+                        try {
+                            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+                            if (bitmap == null) throw new Exception("Bitmap kosong");
+                            InputImage image = InputImage.fromBitmap(bitmap, 0);
+                            TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                            recognizer.process(image)
+                                    .addOnSuccessListener(text -> {
+                                        String ocr = text.getText() == null ? "" : text.getText().trim();
+                                        String cleaned = cleanOcrEmmc(ocr);
+                                        target.setText(cleaned);
+                                        if (cleaned.isEmpty()) {
+                                            result.setText("OCR belum menemukan kode. Coba zoom/fokus lalu SCAN OCR lagi.");
+                                        } else {
+                                            searchEmmc(cleaned, result);
+                                        }
+                                        try { bitmap.recycle(); } catch (Exception ignored) {}
+                                        try { file.delete(); } catch (Exception ignored) {}
+                                        recognizer.close();
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        result.setText("OCR gagal: " + e.getMessage());
+                                        try { bitmap.recycle(); } catch (Exception ignored) {}
+                                        try { file.delete(); } catch (Exception ignored) {}
+                                        recognizer.close();
+                                    });
+                        } catch (Exception e) {
+                            result.setText("Foto OCR gagal: " + e.getMessage());
+                            try { file.delete(); } catch (Exception ignored) {}
+                        }
+                    }
+                    @Override public void onError(@NonNull ImageCaptureException exception) {
+                        result.setText("Pengambilan foto OCR gagal: " + exception.getMessage());
+                    }
+                });
+    }
+
+    private String cleanOcrEmmc(String text) {
+        if (text == null) return "";
+        String[] lines = text.toUpperCase(Locale.US).split("\\R+");
+        String best = "";
+        for (String line : lines) {
+            String x = line.replaceAll("[^A-Z0-9-]", "");
+            if (x.length() >= 5 && x.length() > best.length()) best = x;
+        }
+        return best;
+    }
+
     @Override
     public void onRequestPermissionsResult(
             int requestCode,
@@ -2365,6 +2591,10 @@ public class MainActivity extends AppCompatActivity {
                 status.setText("Izin kamera diperlukan");
             }
         }
+        if (requestCode == AUDIO_PERMISSION && grantResults.length > 0
+                && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "Mikrofon siap. Tekan VOICE lagi.", Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -2375,6 +2605,4 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {
         }
-        super.onDestroy();
-    }
-}
+        if (speechRecognizer != null) { try { speechRecognizer.destroy(); } catch (Exception ignored) {} }\n        super.onDestroy();\n    }\n}
