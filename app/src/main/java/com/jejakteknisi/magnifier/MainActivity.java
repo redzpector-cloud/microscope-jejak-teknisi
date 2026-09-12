@@ -1579,12 +1579,29 @@ public class MainActivity extends AppCompatActivity {
     private void setLivePanelVisible(boolean visible) {
         livePanelVisible = visible;
         if (frozen) visible = true;
+
         int v = visible ? View.VISIBLE : View.GONE;
+
+        // LIVE auto-hide: hide the complete top header and adjustment panels,
+        // but KEEP the essential camera controls accessible at all times.
+        if (topBar != null) topBar.setVisibility(v);
         if (infoRow != null) infoRow.setVisibility(v);
         if (zoomBar != null) zoomBar.setVisibility(v);
         if (exposureRow != null) exposureRow.setVisibility(v);
         if (detailRow != null) detailRow.setVisibility(v);
-        if (controlsBar != null) controlsBar.setVisibility(v);
+
+        if (controlsBar != null) {
+            // The bottom camera strip itself stays visible. During auto-hide
+            // only Lampu, FOTO and Fokus remain available.
+            controlsBar.setVisibility(View.VISIBLE);
+            if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (freezeBtn != null) freezeBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (overlayBtn != null) overlayBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
+            if (torchBtn != null) torchBtn.setVisibility(View.VISIBLE);
+            if (photoBtn != null) photoBtn.setVisibility(View.VISIBLE);
+            if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(View.VISIBLE);
+        }
     }
 
     private void scheduleLivePanelHide() {
