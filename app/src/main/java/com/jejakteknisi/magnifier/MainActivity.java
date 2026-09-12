@@ -296,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
         detailRow.setOrientation(LinearLayout.HORIZONTAL);
         detailRow.setGravity(Gravity.CENTER_VERTICAL);
         detailRow.setPadding(dp(8), 0, dp(8), 0);
-        detailText = makeInfoText("Detail 80%");
+        detailText = makeInfoText("Ultra Detail 80%");
         detailRow.addView(detailText, new LinearLayout.LayoutParams(dp(88), dp(38)));
         detailBar = new SeekBar(this);
         detailBar.setMax(100);
@@ -367,7 +367,7 @@ public class MainActivity extends AppCompatActivity {
 
         detailBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                detailText.setText("Detail " + progress + "%");
+                detailText.setText("Ultra Detail " + progress + "%");
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
@@ -378,10 +378,11 @@ public class MainActivity extends AppCompatActivity {
 
         detailBtn.setOnClickListener(v -> {
             detailOn = !detailOn;
-            detailBtn.setText(detailOn ? "DETAIL\nON" : "DETAIL\nOFF");
+            detailBtn.setText(detailOn ? "ULTRA\nDETAIL" : "DETAIL\nNORMAL");
             if (camera != null) {
-                status.setText(detailOn ? "Detail high quality ON" : "Detail normal");
+                restartLivePreview();
             }
+            status.setText(detailOn ? "LIVE • Ultra Detail ON" : "LIVE • Detail normal");
         });
 
         minus.setOnClickListener(v -> {
@@ -1529,7 +1530,10 @@ public class MainActivity extends AppCompatActivity {
             try {
                 ProcessCameraProvider provider = future.get();
 
-                Preview previewUseCase = new Preview.Builder().build();
+                Preview.Builder previewBuilder = new Preview.Builder();
+                Camera2Interop.Extender<Preview> previewExtender = new Camera2Interop.Extender<>(previewBuilder);
+                applyLiveDetailRequest(previewExtender);
+                Preview previewUseCase = previewBuilder.build();
 
                         ImageCapture.Builder captureBuilder = new ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
@@ -1551,13 +1555,27 @@ public class MainActivity extends AppCompatActivity {
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
                 setExposure(0);
-                status.setText("Kamera LIVE • tap untuk fokus • Detail ON");
+                status.setText(detailOn ? "Kamera LIVE • Ultra Detail ON" : "Kamera LIVE • Detail normal");
 
             } catch (Exception e) {
                 status.setText("Kamera gagal");
                 e.printStackTrace();
             }
         }, ContextCompat.getMainExecutor(this));
+    }
+
+    private void applyLiveDetailRequest(Camera2Interop.Extender<Preview> extender) {
+        try {
+            int edge = detailOn ? CaptureRequest.EDGE_MODE_HIGH_QUALITY : CaptureRequest.EDGE_MODE_FAST;
+            int nr = detailOn ? CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY : CaptureRequest.NOISE_REDUCTION_MODE_FAST;
+            extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, edge);
+            extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, nr);
+        } catch (Throwable ignored) {}
+    }
+
+    private void restartLivePreview() {
+        if (frozen || ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) return;
+        startCamera();
     }
 
     private void updateZoomText() {
