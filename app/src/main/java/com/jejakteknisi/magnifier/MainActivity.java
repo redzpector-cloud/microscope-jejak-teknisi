@@ -33,6 +33,7 @@ import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import java.util.ArrayList;
 
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -1310,9 +1311,9 @@ public class MainActivity extends AppCompatActivity {
                         invalidate(); return true;
                     case MotionEvent.ACTION_MOVE:
                         if (drawing && !items.isEmpty()) {
-                            Annotation penStroke=items.get(items.size()-1);
+                            Annotation currentPenStroke=items.get(items.size()-1);
                             float[] q=viewToSource(x,y);
-                            penStroke.points.add(new PointF(q[0],q[1]));
+                            currentPenStroke.points.add(new PointF(q[0],q[1]));
                             invalidate();
                         }
                         return true;
