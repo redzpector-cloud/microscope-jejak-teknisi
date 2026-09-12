@@ -1199,7 +1199,7 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; invalidate(); }
+        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; transformingSelected=false; selectedHandle=0; transformStart=null; invalidate(); }
         void prepareOcrHistory(){ if(!items.isEmpty() || items.isEmpty()) pushUndo(); }
         void addOcr(float x1, float y1, float x2, float y2, String text) {
             items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
@@ -1501,6 +1501,36 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
 
+        private int hitSelectionHandle(float x, float y, Annotation a) {
+            float[] box=annotationViewBounds(a);
+            float l=box[0], t=box[1], r=box[2], b=box[3];
+            float hs=dp(22);
+            float[][] pts={{l,t},{(l+r)/2f,t},{r,t},{r,(t+b)/2f},{r,b},{(l+r)/2f,b},{l,b},{l,(t+b)/2f}};
+            for(int i=0;i<8;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return i+1;
+            float rx=(l+r)/2f, ry=t-dp(28);
+            if(Math.hypot(x-rx,y-ry)<=dp(24)) return 10;
+            return 0;
+        }
+
+        private void scaleAnnotationFromStart(Annotation a, Annotation base, float sx, float sy) {
+            if(base==null || a==null) return;
+            float cx,cy;
+            if(base.type==AnnotationMode.PEN && base.points!=null && !base.points.isEmpty()) {
+                float minX=base.points.get(0).x,maxX=minX,minY=base.points.get(0).y,maxY=minY;
+                for(PointF pt:base.points){minX=Math.min(minX,pt.x);maxX=Math.max(maxX,pt.x);minY=Math.min(minY,pt.y);maxY=Math.max(maxY,pt.y);}
+                cx=(minX+maxX)/2f; cy=(minY+maxY)/2f;
+                if(a.points==null) a.points=new ArrayList<>(); else a.points.clear();
+                for(PointF pt:base.points) a.points.add(new PointF(cx+(pt.x-cx)*sx,cy+(pt.y-cy)*sy));
+            } else {
+                cx=(Math.min(base.x1,base.x2)+Math.max(base.x1,base.x2))/2f;
+                cy=(Math.min(base.y1,base.y2)+Math.max(base.y1,base.y2))/2f;
+                a.x1=cx+(base.x1-cx)*sx; a.x2=cx+(base.x2-cx)*sx;
+                a.y1=cy+(base.y1-cy)*sy; a.y2=cy+(base.y2-cy)*sy;
+            }
+            a.rotation=base.rotation;
+            a.size=base.size*Math.max(0.25f,Math.min(4f,(Math.abs(sx)+Math.abs(sy))/2f));
+        }
+
         @Override public boolean onTouchEvent(MotionEvent e) {
             if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
@@ -1531,12 +1561,51 @@ public class MainActivity extends AppCompatActivity {
             if (mode==AnnotationMode.SELECT) {
                 int action=e.getActionMasked();
                 if (action==MotionEvent.ACTION_DOWN) {
+                    // If the current object is already selected, give its handles priority.
+                    if(selected!=null) {
+                        int h=hitSelectionHandle(x,y,selected);
+                        if(h!=0) {
+                            selectedHandle=h;
+                            moveHistoryPushed=true;
+                            transformStart=selected.copy();
+                            float[] sp=viewToSource(x,y);
+                            float[] box=annotationViewBounds(selected);
+                            float cx=(box[0]+box[2])/2f, cy=(box[1]+box[3])/2f;
+                            float[] cp=viewToSource(cx,cy);
+                            transformStartAngle=(float)Math.toDegrees(Math.atan2(sp[1]-cp[1],sp[0]-cp[0]));
+                            transformStartDistance=(float)Math.hypot(sp[0]-cp[0],sp[1]-cp[1]);
+                            rotatingSelected=(h==10);
+                            transformingSelected=(h!=10);
+                            return true;
+                        }
+                    }
                     selected=hitTest(x,y);
+                    selectedHandle=0;
                     moveHistoryPushed=false;
                     lastSelectX=x; lastSelectY=y;
                     rotatingSelected=false;
+                    transformingSelected=false;
                     lastRotateAngle=0f;
                     return true;
+                }
+                if(selected!=null && selectedHandle!=0 && action==MotionEvent.ACTION_MOVE) {
+                    if(transformStart==null) transformStart=selected.copy();
+                    float[] cur=viewToSource(x,y);
+                    float[] box=annotationViewBounds(transformStart);
+                    float[] csrc=viewToSource((box[0]+box[2])/2f,(box[1]+box[3])/2f);
+                    if(selectedHandle==10) {
+                        float ang=(float)Math.toDegrees(Math.atan2(cur[1]-csrc[1],cur[0]-csrc[0]));
+                        selected.rotation=transformStart.rotation+(ang-transformStartAngle);
+                    } else {
+                        float dx0=transformStartDistance;
+                        float dx=(float)Math.hypot(cur[0]-csrc[0],cur[1]-csrc[1]);
+                        float uniform=dx/Math.max(1f,dx0);
+                        float sx=uniform, sy=uniform;
+                        if(selectedHandle==2||selectedHandle==6) { sy=1f; }
+                        else if(selectedHandle==4||selectedHandle==8) { sx=1f; }
+                        scaleAnnotationFromStart(selected,transformStart,sx,sy);
+                    }
+                    invalidate(); return true;
                 }
                 if (selected!=null && e.getPointerCount()>=2 &&
                         (action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_POINTER_UP)) {
@@ -1584,6 +1653,9 @@ public class MainActivity extends AppCompatActivity {
                     // Dragging still only moves the selected object.
                     boolean simpleTap = Math.hypot(x-lastSelectX, y-lastSelectY) < dp(12);
                     rotatingSelected=false;
+                    transformingSelected=false;
+                    selectedHandle=0;
+                    transformStart=null;
                     lastSelectX=x; lastSelectY=y;
                     invalidate();
                     if (action==MotionEvent.ACTION_UP && simpleTap && selected != null && selected.type==AnnotationMode.TEXT) {
