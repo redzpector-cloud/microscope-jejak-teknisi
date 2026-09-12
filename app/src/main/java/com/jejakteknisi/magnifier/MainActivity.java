@@ -135,7 +135,11 @@ public class MainActivity extends AppCompatActivity {
         b.setTextSize(13);
         b.setAllCaps(false);
         b.setGravity(Gravity.CENTER);
-        b.setPadding(dp(2), 0, dp(2), 0);
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
         b.setBackgroundColor(Color.rgb(35, 40, 44));
         return b;
     }
@@ -527,7 +531,7 @@ public class MainActivity extends AppCompatActivity {
         Button save = makeButton("💾\nSimpan");
         Button share = makeButton("↗\nShare");
 
-        Button[] row1 = {pan, select, pen, marker, arrow, circle};
+        Button[] row1 = {pan, select, pen, marker, arrow, circle, text};
         for (Button b : row1) {
             b.setTextSize(10);
             toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
@@ -597,7 +601,13 @@ public class MainActivity extends AppCompatActivity {
         undo.setOnClickListener(v -> { annotationView.undo(); status.setText("Undo anotasi"); });
         redo.setOnClickListener(v -> { annotationView.redo(); status.setText("Redo anotasi"); });
         duplicate.setOnClickListener(v -> { if (annotationView.duplicateSelected()) status.setText("Objek diduplikat"); else status.setText("Pilih objek dulu"); });
-        edit.setOnClickListener(v -> editSelectedText());
+        edit.setOnClickListener(v -> {
+            if (annotationView != null && annotationView.hasSelectedText()) {
+                editSelectedText();
+            } else {
+                setAnnotationMode(AnnotationMode.SELECT, "Edit aktif • tap teks yang ingin diubah");
+            }
+        });
         clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
         save.setOnClickListener(v -> saveAnnotatedFreeze());
         share.setOnClickListener(v -> shareAnnotatedFreeze());
@@ -1308,6 +1318,8 @@ public class MainActivity extends AppCompatActivity {
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
                     float dx=p[0]-a.x1, dy=p[1]-a.y1;
                     float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
+                    paint.setTextSize(dp((int)(18 + a.size)) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                    paint.setTypeface(Typeface.DEFAULT_BOLD);
                     float textW=paint.measureText(a.text==null?"":a.text);
                     float textH=paint.getTextSize();
                     if (rx>=-tolerance && rx<=textW+tolerance && ry>=-textH-tolerance && ry<=tolerance) return a;
@@ -1372,10 +1384,15 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 }
                 if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
-                    // Keep the object selected so it can be rotated/moved again without reselecting.
+                    // A simple tap on a text object opens the editor directly.
+                    // Dragging still only moves the selected object.
+                    boolean simpleTap = Math.hypot(x-lastSelectX, y-lastSelectY) < dp(12);
                     rotatingSelected=false;
                     lastSelectX=x; lastSelectY=y;
                     invalidate();
+                    if (action==MotionEvent.ACTION_UP && simpleTap && selected != null && selected.type==AnnotationMode.TEXT) {
+                        editSelectedText();
+                    }
                     return true;
                 }
                 return true;
