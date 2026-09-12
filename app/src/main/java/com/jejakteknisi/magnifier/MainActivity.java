@@ -121,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout cameraBox;
     private AnnotationView annotationView;
     private LinearLayout annotationBar;
-    private enum AnnotationMode { NONE, SELECT, PEN, MARKER, ARROW, LINE, CIRCLE, RECT, HIGHLIGHT, TEXT, OCR }
+    private enum AnnotationMode { NONE, SELECT, PEN, MARKER, ARROW, LINE, CIRCLE, RECT, HIGHLIGHT, TEXT, OCR, CROP }
     private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
@@ -577,8 +577,8 @@ public class MainActivity extends AppCompatActivity {
         circle.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"));
         line.setOnClickListener(v -> setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"));
         rect.setOnClickListener(v -> setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"));
-        highlight.setOnClickListener(v -> setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik untuk menyorot jalur/komponen"));
-        crop.setOnClickListener(v -> cropToCurrentView());
+        highlight.setOnClickListener(v -> setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"));
+        crop.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CROP, "Crop aktif • tarik kotak pada area yang ingin dipotong"));
         rotate.setOnClickListener(v -> rotateFrozenImage());
         adjust.setOnClickListener(v -> showImageAdjustDialog());
         resetView.setOnClickListener(v -> { frozenZoom=1f; frozenPanX=0f; frozenPanY=0f; if(zoomBar!=null) zoomBar.setProgress(0); updateFrozenImage(); status.setText("Tampilan gambar di-reset"); });
@@ -717,37 +717,33 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cropToCurrentView() {
+        // Dipertahankan untuk kompatibilitas internal; tombol Crop sekarang
+        // memakai seleksi kotak langsung di atas gambar.
+        if (annotationView != null) {
+            setAnnotationMode(AnnotationMode.CROP, "Crop aktif • tarik kotak pada area yang ingin dipotong");
+        }
+    }
+
+    private void applyCropSelection(float x1, float y1, float x2, float y2) {
         if (!frozen || frozenBitmap == null) return;
-        CropInfo crop = getCurrentCropInfo();
-        if (crop == null || crop.width < 2 || crop.height < 2) {
-            status.setText("Area crop terlalu kecil");
-            return;
-        }
-        // Pada zoom 1x seluruh gambar memang terlihat, sehingga crop akan
-        // tampak seperti tidak berubah. Arahkan teknisi untuk zoom/geser dulu.
-        if (crop.width >= frozenBitmap.getWidth() && crop.height >= frozenBitmap.getHeight()) {
-            status.setText("Crop siap • Zoom + dan geser untuk memilih area");
-            return;
-        }
-        Bitmap old = frozenBitmap;
+        float[] a = annotationView.viewToSourcePublic(x1, y1);
+        float[] b = annotationView.viewToSourcePublic(x2, y2);
+        int left = Math.max(0, Math.min(frozenBitmap.getWidth()-1, Math.round(Math.min(a[0], b[0]))));
+        int top = Math.max(0, Math.min(frozenBitmap.getHeight()-1, Math.round(Math.min(a[1], b[1]))));
+        int right = Math.max(left+1, Math.min(frozenBitmap.getWidth(), Math.round(Math.max(a[0], b[0]))));
+        int bottom = Math.max(top+1, Math.min(frozenBitmap.getHeight(), Math.round(Math.max(a[1], b[1]))));
+        int w = right-left, h = bottom-top;
+        if (w < 20 || h < 20) { status.setText("Area crop terlalu kecil"); return; }
+        Bitmap old=frozenBitmap;
         try {
-            // Buat satu bitmap hasil saja agar tidak boros RAM.
-            Bitmap cropped = Bitmap.createBitmap(old, crop.left, crop.top, crop.width, crop.height);
-            if (cropped == null) throw new IllegalStateException("Bitmap crop null");
-            frozenBitmap = cropped;
-            frozenZoom = 1f; frozenPanX = 0f; frozenPanY = 0f;
-            if (zoomBar != null) zoomBar.setProgress(0);
-            if (annotationView != null) annotationView.clearAll();
+            Bitmap cropped=Bitmap.createBitmap(old,left,top,w,h);
+            frozenBitmap=cropped; frozenZoom=1f; frozenPanX=0f; frozenPanY=0f;
+            if(zoomBar!=null) zoomBar.setProgress(0);
+            if(annotationView!=null) { annotationView.clearAll(); annotationView.setMode(AnnotationMode.SELECT); }
             updateFrozenImage();
-            if (freezeView != null) {
-                freezeView.setImageBitmap(frozenBitmap);
-                freezeView.invalidate();
-            }
-            status.setText("Crop diterapkan • area kerja baru");
-        } catch (Throwable e) {
-            frozenBitmap = old;
-            status.setText("Crop gagal • coba area lebih kecil");
-        }
+            if(freezeView!=null){ freezeView.setImageBitmap(frozenBitmap); freezeView.invalidate(); }
+            status.setText("Crop diterapkan • area baru siap diedit");
+        } catch(Throwable e) { frozenBitmap=old; status.setText("Crop gagal • coba area lebih kecil"); }
     }
 
     private void rotateFrozenImage() {
@@ -1053,6 +1049,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private class AnnotationView extends View {
+        private boolean cropSelecting=false;
+        private float cropStartX, cropStartY, cropEndX, cropEndY;
+
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final java.util.ArrayList<Annotation> items = new java.util.ArrayList<>();
         private AnnotationMode mode = AnnotationMode.NONE;
@@ -1130,6 +1129,8 @@ public class MainActivity extends AppCompatActivity {
             return pts;
         }
 
+        float[] viewToSourcePublic(float x, float y) { return viewToSource(x,y); }
+
         void addTextAtView(float x, float y, String text) {
             float[] p=viewToSource(x,y);
             pushUndo(); items.add(Annotation.text(p[0],p[1],text,currentColor,strokeDp));
@@ -1139,9 +1140,22 @@ public class MainActivity extends AppCompatActivity {
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             drawAnnotations(canvas);
-            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER && mode != AnnotationMode.SELECT && mode != AnnotationMode.PEN) {
+            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER && mode != AnnotationMode.SELECT && mode != AnnotationMode.PEN && mode != AnnotationMode.CROP) {
                 float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
                 drawOne(canvas, Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));
+            }
+            if (mode == AnnotationMode.CROP && cropSelecting) {
+                Paint cp = new Paint(Paint.ANTI_ALIAS_FLAG);
+                cp.setStyle(Paint.Style.FILL); cp.setColor(Color.argb(90,0,0,0));
+                canvas.drawRect(0,0,getWidth(),getHeight(),cp);
+                cp.setStyle(Paint.Style.STROKE); cp.setStrokeWidth(dp(2)); cp.setColor(Color.WHITE);
+                float l=Math.min(cropStartX,cropEndX), t=Math.min(cropStartY,cropEndY);
+                float r=Math.max(cropStartX,cropEndX), b=Math.max(cropStartY,cropEndY);
+                canvas.drawRect(l,t,r,b,cp);
+                cp.setColor(Color.YELLOW); cp.setStrokeWidth(dp(1));
+                float thirdW=(r-l)/3f, thirdH=(b-t)/3f;
+                canvas.drawLine(l+thirdW,t,l+thirdW,b,cp); canvas.drawLine(l+2*thirdW,t,l+2*thirdW,b,cp);
+                canvas.drawLine(l,t+thirdH,r,t+thirdH,cp); canvas.drawLine(l,t+2*thirdH,r,t+2*thirdH,cp);
             }
         }
 
@@ -1189,8 +1203,10 @@ public class MainActivity extends AppCompatActivity {
                 canvas.drawRect(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.HIGHLIGHT) {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(dp(18) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
-                paint.setAlpha(85);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setStrokeWidth(dp(22) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setColor(a.color == Color.RED || a.color == Color.YELLOW || a.color == Color.GREEN || a.color == Color.CYAN ? a.color : Color.YELLOW);
+                paint.setAlpha(105);
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
                 paint.setAlpha(255);
             } else if (a.type==AnnotationMode.TEXT) {
@@ -1328,6 +1344,21 @@ public class MainActivity extends AppCompatActivity {
             }
         if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
             if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); pushUndo(); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
+            if (mode==AnnotationMode.CROP) {
+                switch(e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        cropSelecting=true; cropStartX=x; cropStartY=y; cropEndX=x; cropEndY=y; invalidate(); return true;
+                    case MotionEvent.ACTION_MOVE:
+                        if(cropSelecting){ cropEndX=x; cropEndY=y; invalidate(); } return true;
+                    case MotionEvent.ACTION_UP:
+                        if(cropSelecting){ cropEndX=x; cropEndY=y; cropSelecting=false; invalidate();
+                            if(Math.abs(cropEndX-cropStartX)>20 && Math.abs(cropEndY-cropStartY)>20){ applyCropSelection(cropStartX,cropStartY,cropEndX,cropEndY); }
+                            else status.setText("Crop batal • tarik kotak lebih besar");
+                        } return true;
+                    case MotionEvent.ACTION_CANCEL: cropSelecting=false; invalidate(); return true;
+                }
+                return true;
+            }
             if (mode==AnnotationMode.PEN) {
                 switch(e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
