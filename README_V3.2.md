@@ -27,4 +27,4 @@ Catatan build: proyek menggunakan Android Gradle Plugin/AndroidX dan workflow Gi
 - Jalur mengikuti transformasi zoom/pan gambar seperti anotasi lainnya.
 
 
-V3.2.5 LIVE UI: top and bottom control bars auto-hide after inactivity; tapping the microscope preview reveals them; tapping controls does not reveal them. LIVE keeps the screen awake.
+V3.2.6 LIVE UI: top and bottom control bars auto-hide after inactivity; tapping the microscope preview reveals them; tapping controls does not reveal them. LIVE keeps the screen awake.

@@ -1583,27 +1583,19 @@ public class MainActivity extends AppCompatActivity {
 
         int v = visible ? View.VISIBLE : View.GONE;
 
-        // LIVE auto-hide: hide the complete top header and adjustment panels,
-        // but KEEP the essential camera controls accessible at all times.
+        // LIVE auto-hide ONLY affects the top UI.
+        // The bottom control bar must ALWAYS remain visible in LIVE mode:
+        // Lamp, Photo, Focus, Grid, Freeze and Zoom controls stay accessible.
         if (topBar != null) topBar.setVisibility(v);
         if (infoRow != null) infoRow.setVisibility(v);
         if (zoomBar != null) zoomBar.setVisibility(v);
         if (exposureRow != null) exposureRow.setVisibility(v);
         if (detailRow != null) detailRow.setVisibility(v);
 
-        if (controlsBar != null) {
-            // LIVE auto-hide applies to BOTH top and bottom UI. The camera preview
-            // itself is never hidden. Pressing a bottom control must not reveal the UI;
-            // only touching the microscope preview does that.
-            controlsBar.setVisibility(v);
-            if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(v);
-            if (freezeBtn != null) freezeBtn.setVisibility(v);
-            if (overlayBtn != null) overlayBtn.setVisibility(v);
-            if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(v);
-            if (torchBtn != null) torchBtn.setVisibility(v);
-            if (photoBtn != null) photoBtn.setVisibility(v);
-            if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(v);
-        }
+        // Never change controlsBar or any bottom-button visibility here.
+        // Pressing a bottom button therefore cannot make the hidden top UI appear;
+        // only a touch on the microscope preview calls showLivePanelTemporarily().
+        if (!frozen && controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
     }
 
     private void scheduleLivePanelHide() {
