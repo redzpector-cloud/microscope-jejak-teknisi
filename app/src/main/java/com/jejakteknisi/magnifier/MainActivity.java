@@ -1172,6 +1172,11 @@ public class MainActivity extends AppCompatActivity {
         private boolean rotatingSelected = false;
         private boolean transformingSelected = false;
         private boolean moveHistoryPushed = false;
+        // Selection/transform state for the 8 resize handles + rotation handle.
+        private int selectedHandle = 0;
+        private Annotation transformStart = null;
+        private float transformStartAngle = 0f;
+        private float transformStartDistance = 1f;
         private float lastTransformDistance = 0f;
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> undoStack = new java.util.ArrayDeque<>();
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> redoStack = new java.util.ArrayDeque<>();
