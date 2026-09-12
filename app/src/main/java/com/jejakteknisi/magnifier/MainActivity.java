@@ -719,35 +719,63 @@ public class MainActivity extends AppCompatActivity {
     private void cropToCurrentView() {
         if (!frozen || frozenBitmap == null) return;
         CropInfo crop = getCurrentCropInfo();
-        if (crop == null) return;
+        if (crop == null || crop.width < 2 || crop.height < 2) {
+            status.setText("Area crop terlalu kecil");
+            return;
+        }
+        // Pada zoom 1x seluruh gambar memang terlihat, sehingga crop akan
+        // tampak seperti tidak berubah. Arahkan teknisi untuk zoom/geser dulu.
+        if (crop.width >= frozenBitmap.getWidth() && crop.height >= frozenBitmap.getHeight()) {
+            status.setText("Crop siap • Zoom + dan geser untuk memilih area");
+            return;
+        }
+        Bitmap old = frozenBitmap;
         try {
-            Bitmap cropped = Bitmap.createBitmap(frozenBitmap, crop.left, crop.top, crop.width, crop.height);
-            frozenBitmap.recycle();
-            frozenBitmap = cropped.copy(Bitmap.Config.ARGB_8888, false);
-            cropped.recycle();
+            // Buat satu bitmap hasil saja agar tidak boros RAM.
+            Bitmap cropped = Bitmap.createBitmap(old, crop.left, crop.top, crop.width, crop.height);
+            if (cropped == null) throw new IllegalStateException("Bitmap crop null");
+            frozenBitmap = cropped;
             frozenZoom = 1f; frozenPanX = 0f; frozenPanY = 0f;
             if (zoomBar != null) zoomBar.setProgress(0);
             if (annotationView != null) annotationView.clearAll();
             updateFrozenImage();
+            if (freezeView != null) {
+                freezeView.setImageBitmap(frozenBitmap);
+                freezeView.invalidate();
+            }
             status.setText("Crop diterapkan • area kerja baru");
-        } catch (Exception e) { status.setText("Crop gagal"); }
+        } catch (Throwable e) {
+            frozenBitmap = old;
+            status.setText("Crop gagal • coba area lebih kecil");
+        }
     }
 
     private void rotateFrozenImage() {
         if (!frozen || frozenBitmap == null) return;
+        Bitmap old = frozenBitmap;
         try {
             android.graphics.Matrix m = new android.graphics.Matrix();
             m.postRotate(90f);
-            Bitmap rotated = Bitmap.createBitmap(frozenBitmap, 0, 0, frozenBitmap.getWidth(), frozenBitmap.getHeight(), m, true);
-            frozenBitmap.recycle();
-            frozenBitmap = rotated.copy(Bitmap.Config.ARGB_8888, false);
-            rotated.recycle();
+            // Jangan membuat copy kedua: ini mengurangi penggunaan RAM dan
+            // mencegah aplikasi keluar saat memutar foto microscope beresolusi besar.
+            Bitmap rotated = Bitmap.createBitmap(old, 0, 0, old.getWidth(), old.getHeight(), m, true);
+            if (rotated == null) throw new IllegalStateException("Bitmap rotate null");
+            frozenBitmap = rotated;
             frozenZoom=1f; frozenPanX=0f; frozenPanY=0f;
             if (zoomBar != null) zoomBar.setProgress(0);
             if (annotationView != null) annotationView.clearAll();
             updateFrozenImage();
+            if (freezeView != null) {
+                freezeView.setImageBitmap(frozenBitmap);
+                freezeView.invalidate();
+            }
             status.setText("Gambar diputar 90°");
-        } catch (Exception e) { status.setText("Putar gagal"); }
+            // old sengaja tidak langsung di-recycle karena ImageView mungkin
+            // masih memegang frame sebelumnya. Android akan membersihkannya.
+        } catch (Throwable e) {
+            frozenBitmap = old;
+            status.setText("Putar gagal • foto terlalu besar, coba foto yang lebih kecil");
+        }
     }
 
     private void showImageAdjustDialog() {
