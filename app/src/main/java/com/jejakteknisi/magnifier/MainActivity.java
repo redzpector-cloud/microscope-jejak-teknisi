@@ -1347,25 +1347,92 @@ public class MainActivity extends AppCompatActivity {
             canvas.drawCircle((l+r)/2f,b,dp(6),sp);
             canvas.drawCircle(l,(t+b)/2f,dp(6),sp);
             canvas.drawCircle(r,(t+b)/2f,dp(6),sp);
-            // Rotation handle.
             float ry=t-dp(28);
             sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
             sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
         }
 
+        /**
+         * Returns an axis-aligned VIEW-space bounding box for the actual
+         * annotation geometry.  The previous implementation built a box from
+         * x1/x2/y1/y2 and then clipped it to the View, which made the yellow
+         * handles jump to the screen edge when an object was partly off-screen.
+         * This version measures the real geometry first, applies object
+         * rotation, then applies frozenMatrix.  Nothing is clipped here; the
+         * Canvas itself clips what is outside the visible image.
+         */
         private float[] annotationViewBounds(Annotation a) {
+            if (a == null) return new float[]{0,0,0,0};
+            float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
+            float padView = dp(12);
+            float pad = padView / scale;
             float minX, minY, maxX, maxY;
+
             if (a.type==AnnotationMode.PEN && a.points!=null && !a.points.isEmpty()) {
                 minX=maxX=a.points.get(0).x; minY=maxY=a.points.get(0).y;
-                for(PointF p:a.points){minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);}
+                for(PointF p:a.points){
+                    minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
+                    minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
+                }
+                pad += a.size * 0.5f;
+            } else if (a.type==AnnotationMode.TEXT) {
+                Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
+                tp.setTypeface(Typeface.DEFAULT_BOLD);
+                tp.setTextSize(dp((int)(18 + a.size)));
+                String txt=a.text==null?"":a.text;
+                float tw=tp.measureText(txt);
+                float th=tp.getTextSize();
+                minX=a.x1; maxX=a.x1+tw; minY=a.y1-th; maxY=a.y1;
+                pad = dp(6)/scale;
+            } else if (a.type==AnnotationMode.MARKER) {
+                float rr=dp((int)a.size);
+                minX=a.x1-rr; maxX=a.x1+rr; minY=a.y1-rr; maxY=a.y1;
+            } else if (a.type==AnnotationMode.JUMPER) {
+                float rr=dp(8);
+                minX=Math.min(a.x1,a.x2)-rr; maxX=Math.max(a.x1,a.x2)+rr;
+                minY=Math.min(a.y1,a.y2)-rr; maxY=Math.max(a.y1,a.y2)+rr;
+            } else if (a.type==AnnotationMode.HIGHLIGHT) {
+                float rr=dp(11);
+                minX=Math.min(a.x1,a.x2)-rr; maxX=Math.max(a.x1,a.x2)+rr;
+                minY=Math.min(a.y1,a.y2)-rr; maxY=Math.max(a.y1,a.y2)+rr;
+            } else if (a.type==AnnotationMode.ARROW) {
+                float len=dp(18);
+                float ang=(float)Math.atan2(a.y2-a.y1,a.x2-a.x1);
+                float ax=a.x2-len*(float)Math.cos(ang-.45f);
+                float ay=a.y2-len*(float)Math.sin(ang-.45f);
+                float bx=a.x2-len*(float)Math.cos(ang+.45f);
+                float by=a.y2-len*(float)Math.sin(ang+.45f);
+                minX=Math.min(Math.min(a.x1,a.x2),Math.min(ax,bx));
+                maxX=Math.max(Math.max(a.x1,a.x2),Math.max(ax,bx));
+                minY=Math.min(Math.min(a.y1,a.y2),Math.min(ay,by));
+                maxY=Math.max(Math.max(a.y1,a.y2),Math.max(ay,by));
+                pad += a.size * 0.5f;
             } else {
-                minX=Math.min(a.x1,a.x2); maxX=Math.max(a.x1,a.x2); minY=Math.min(a.y1,a.y2); maxY=Math.max(a.y1,a.y2);
+                minX=Math.min(a.x1,a.x2); maxX=Math.max(a.x1,a.x2);
+                minY=Math.min(a.y1,a.y2); maxY=Math.max(a.y1,a.y2);
+                pad += a.size * 0.5f;
             }
-            float pad=dp(14);
-            float[] pts={minX-pad,minY-pad,maxX+pad,maxY+pad};
-            frozenMatrix.mapRect(new RectF(pts[0],pts[1],pts[2],pts[3]));
-            return new float[]{Math.max(0,pts[0]),Math.max(0,pts[1]),Math.min(getWidth(),pts[2]),Math.min(getHeight(),pts[3])};
+
+            minX-=pad; minY-=pad; maxX+=pad; maxY+=pad;
+            float cx=(minX+maxX)/2f, cy=(minY+maxY)/2f;
+
+            // Rotate the source-space bounds around the object's visual center.
+            float rot=a.rotation;
+            float rad=(float)Math.toRadians(rot);
+            float cs=(float)Math.cos(rad), sn=(float)Math.sin(rad);
+            float[] xs={minX,maxX,maxX,minX};
+            float[] ys={minY,minY,maxY,maxY};
+            float outL=Float.POSITIVE_INFINITY,outT=Float.POSITIVE_INFINITY;
+            float outR=Float.NEGATIVE_INFINITY,outB=Float.NEGATIVE_INFINITY;
+            for(int i=0;i<4;i++){
+                float dx=xs[i]-cx, dy=ys[i]-cy;
+                float sx=cx+dx*cs-dy*sn, sy=cy+dx*sn+dy*cs;
+                float[] v=sourceToView(sx,sy);
+                outL=Math.min(outL,v[0]); outR=Math.max(outR,v[0]);
+                outT=Math.min(outT,v[1]); outB=Math.max(outB,v[1]);
+            }
+            return new float[]{outL,outT,outR,outB};
         }
 
         private void drawOneSource(Canvas canvas, Annotation a) {
@@ -1476,31 +1543,45 @@ public class MainActivity extends AppCompatActivity {
                             if (distancePointToSegment(p[0],p[1],p0.x,p0.y,p1.x,p1.y)<=tolerance) return a;
                         }
                     }
-                } else if (a.type==AnnotationMode.ARROW) {
-                    // Test against the actual rotated shaft.
-                    float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
-                    double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
-                    float rx=(float)(cx+(p[0]-cx)*cs-(p[1]-cy)*sn);
-                    float ry=(float)(cy+(p[0]-cx)*sn+(p[1]-cy)*cs);
-                    if (distancePointToSegment(rx,ry,a.x1,a.y1,a.x2,a.y2)<=tolerance) return a;
-                } else if (a.type==AnnotationMode.JUMPER) {
-                    if (distancePointToSegment(p[0],p[1],a.x1,a.y1,a.x2,a.y2)<=tolerance*1.5f) return a;
+                } else if (a.type==AnnotationMode.ARROW || a.type==AnnotationMode.LINE || a.type==AnnotationMode.HIGHLIGHT || a.type==AnnotationMode.JUMPER) {
+                    float tx=p[0], ty=p[1];
+                    if (a.rotation!=0f) {
+                        float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                        double rr=Math.toRadians(-a.rotation), cs=Math.cos(rr), sn=Math.sin(rr);
+                        float dx=tx-cx, dy=ty-cy;
+                        tx=(float)(cx+dx*cs-dy*sn); ty=(float)(cy+dx*sn+dy*cs);
+                    }
+                    float tol=tolerance + dp(a.type==AnnotationMode.HIGHLIGHT?12:4)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                    if (distancePointToSegment(tx,ty,a.x1,a.y1,a.x2,a.y2)<=tol) return a;
+                    if (a.type==AnnotationMode.ARROW) {
+                        float len=dp(18);
+                        double ang=Math.atan2(a.y2-a.y1,a.x2-a.x1);
+                        float ax=a.x2-len*(float)Math.cos(ang-.45), ay=a.y2-len*(float)Math.sin(ang-.45);
+                        float bx=a.x2-len*(float)Math.cos(ang+.45), by=a.y2-len*(float)Math.sin(ang+.45);
+                        if(distancePointToSegment(tx,ty,a.x2,a.y2,ax,ay)<=tol || distancePointToSegment(tx,ty,a.x2,a.y2,bx,by)<=tol) return a;
+                    }
                 } else if (a.type==AnnotationMode.TEXT) {
-                    // Rotate the touch point back around the text anchor before hit testing.
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
                     float dx=p[0]-a.x1, dy=p[1]-a.y1;
                     float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
-                    float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
-                    paint.setTextSize(dp((int)(18 + a.size)) * scale);
-                    paint.setTypeface(Typeface.DEFAULT_BOLD);
-                    float textW=paint.measureText(a.text==null?"":a.text);
-                    float textH=paint.getTextSize();
-                    if (rx>=-tolerance && rx<=textW+tolerance && ry>=-textH-tolerance && ry<=tolerance) return a;
-                } else {
-                    float minX=Math.min(a.x1,a.x2)-tolerance, maxX=Math.max(a.x1,a.x2)+tolerance;
-                    float minY=Math.min(a.y1,a.y2)-tolerance, maxY=Math.max(a.y1,a.y2)+tolerance;
-                    if (a.type==AnnotationMode.MARKER) { minX=a.x1-tolerance;maxX=a.x1+tolerance;minY=a.y1-tolerance;maxY=a.y1+tolerance; }
-                    if (p[0]>=minX && p[0]<=maxX && p[1]>=minY && p[1]<=maxY) return a;
+                    Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);
+                    tp.setTypeface(Typeface.DEFAULT_BOLD);
+                    tp.setTextSize(dp((int)(18+a.size)));
+                    float textW=tp.measureText(a.text==null?"":a.text), textH=tp.getTextSize();
+                    float tol=tolerance;
+                    if(rx>=-tol && rx<=textW+tol && ry>=-textH-tol && ry<=tol) return a;
+                } else if (a.type==AnnotationMode.CIRCLE) {
+                    float l=Math.min(a.x1,a.x2), r=Math.max(a.x1,a.x2), t=Math.min(a.y1,a.y2), b=Math.max(a.y1,a.y2);
+                    float cx=(l+r)/2f, cy=(t+b)/2f, rx=Math.max(1f,(r-l)/2f), ry=Math.max(1f,(b-t)/2f);
+                    float nx=(p[0]-cx)/rx, ny=(p[1]-cy)/ry;
+                    if(nx*nx+ny*ny<=1.25f) return a;
+                } else if (a.type==AnnotationMode.RECT || a.type==AnnotationMode.OCR) {
+                    float l=Math.min(a.x1,a.x2)-tolerance, r=Math.max(a.x1,a.x2)+tolerance;
+                    float t=Math.min(a.y1,a.y2)-tolerance, b=Math.max(a.y1,a.y2)+tolerance;
+                    if(p[0]>=l && p[0]<=r && p[1]>=t && p[1]<=b) return a;
+                } else if (a.type==AnnotationMode.MARKER) {
+                    float rr=tolerance+dp((int)a.size);
+                    if(Math.hypot(p[0]-a.x1,p[1]-a.y1)<=rr) return a;
                 }
             }
             return null;
