@@ -25,3 +25,6 @@ Catatan build: proyek menggunakan Android Gradle Plugin/AndroidX dan workflow Gi
 - Tombol JUMPER ditambahkan ke toolbar Editor.
 - Mode JUMPER menggambar jalur dengan titik pad di kedua ujung.
 - Jalur mengikuti transformasi zoom/pan gambar seperti anotasi lainnya.
+
+
+V3.2.5 LIVE UI: top and bottom control bars auto-hide after inactivity; tapping the microscope preview reveals them; tapping controls does not reveal them. LIVE keeps the screen awake.

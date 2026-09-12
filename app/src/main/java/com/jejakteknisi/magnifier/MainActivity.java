@@ -169,6 +169,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // LIVE microscope: keep the display awake so the screen does not dim/sleep
+        // while the technician is inspecting a PCB.
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         // Edge-to-edge: keep the camera immersive, but reserve system-bar space
         // for the header and bottom controls so buttons (including Lampu/Flash)
         // are never covered by the Android navigation bar.
@@ -427,11 +431,9 @@ public class MainActivity extends AppCompatActivity {
 
         minus.setOnClickListener(v -> {
             if (frozen) changeFrozenZoom(-0.5f); else changeZoom(-0.5f);
-            showLivePanelTemporarily();
         });
         plus.setOnClickListener(v -> {
             if (frozen) changeFrozenZoom(0.5f); else changeZoom(0.5f);
-            showLivePanelTemporarily();
         });
         torchBtn.setOnClickListener(v -> toggleTorch());
         freezeBtn.setOnClickListener(v -> toggleFreeze());
@@ -439,7 +441,6 @@ public class MainActivity extends AppCompatActivity {
             if (preview != null) {
                 focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f);
             }
-            showLivePanelTemporarily();
         });
         photoBtn.setOnClickListener(v -> takePhoto());
         overlayBtn.setOnClickListener(v -> showOverlaySettings());
@@ -1591,16 +1592,17 @@ public class MainActivity extends AppCompatActivity {
         if (detailRow != null) detailRow.setVisibility(v);
 
         if (controlsBar != null) {
-            // The bottom camera strip itself stays visible. During auto-hide
-            // only Lampu, FOTO and Fokus remain available.
-            controlsBar.setVisibility(View.VISIBLE);
-            if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
-            if (freezeBtn != null) freezeBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
-            if (overlayBtn != null) overlayBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
-            if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(visible ? View.VISIBLE : View.GONE);
-            if (torchBtn != null) torchBtn.setVisibility(View.VISIBLE);
-            if (photoBtn != null) photoBtn.setVisibility(View.VISIBLE);
-            if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(View.VISIBLE);
+            // LIVE auto-hide applies to BOTH top and bottom UI. The camera preview
+            // itself is never hidden. Pressing a bottom control must not reveal the UI;
+            // only touching the microscope preview does that.
+            controlsBar.setVisibility(v);
+            if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(v);
+            if (freezeBtn != null) freezeBtn.setVisibility(v);
+            if (overlayBtn != null) overlayBtn.setVisibility(v);
+            if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(v);
+            if (torchBtn != null) torchBtn.setVisibility(v);
+            if (photoBtn != null) photoBtn.setVisibility(v);
+            if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(v);
         }
     }
 
