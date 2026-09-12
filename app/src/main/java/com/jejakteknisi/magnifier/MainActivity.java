@@ -255,7 +255,10 @@ public class MainActivity extends AppCompatActivity {
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(13);
         top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
-\n        emmcDbBtn = makeButton("💾\neMMC DB");\n        emmcDbBtn.setTextSize(11);\n        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));\n
+        emmcDbBtn = makeButton("💾\neMMC DB");
+        emmcDbBtn.setTextSize(11);
+        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
+
         root.addView(top);
 
         cameraBox = new FrameLayout(this);
@@ -431,7 +434,8 @@ public class MainActivity extends AppCompatActivity {
 
         autoExposureBtn.setOnClickListener(v -> setExposure(0));
         galleryBtn.setOnClickListener(v -> openGallery());
-        emmcDbBtn.setOnClickListener(v -> showEmmcDatabase());\n
+        emmcDbBtn.setOnClickListener(v -> showEmmcDatabase());
+
         detailBtn.setOnClickListener(v -> {
             detailOn = !detailOn;
             detailBtn.setText(detailOn ? "ULTRA\nDETAIL" : "DETAIL\nNORMAL");
@@ -2442,7 +2446,7 @@ public class MainActivity extends AppCompatActivity {
         }
         String found = findEmmcInAsset(query);
         if (found == null) {
-            result.setText("KODE: " + query + "\\n\\nTidak ditemukan di database offline.\\n\\nGunakan SCAN OCR untuk membaca ulang, atau tambahkan data ke database/emmc_database.csv.");
+            result.setText("KODE: " + query + "\n\nTidak ditemukan di database offline.\n\nGunakan SCAN OCR untuk membaca ulang, atau tambahkan data ke database/emmc_database.csv.");
         } else {
             result.setText(found);
         }
@@ -2462,11 +2466,11 @@ public class MainActivity extends AppCompatActivity {
                 if (p.length < 5) continue;
                 String part = normalizeEmmc(p[0]);
                 if (query.equals(part) || query.contains(part) || part.contains(query)) {
-                    return "eMMC DITEMUKAN\\n\\n"
-                            + "Part Number : " + p[0] + "\\n"
-                            + "Brand       : " + p[1] + "\\n"
-                            + "Kapasitas   : " + p[2] + "\\n"
-                            + "Grade       : " + p[3] + "\\n"
+                    return "eMMC DITEMUKAN\n\n"
+                            + "Part Number : " + p[0] + "\n"
+                            + "Brand       : " + p[1] + "\n"
+                            + "Kapasitas   : " + p[2] + "\n"
+                            + "Grade       : " + p[3] + "\n"
                             + "Catatan     : " + p[4];
                 }
             }
@@ -2521,7 +2525,7 @@ public class MainActivity extends AppCompatActivity {
             result.setText("Kamera belum siap.");
             return;
         }
-        result.setText("Memotret eMMC untuk OCR...\\nFoto hanya dipakai sementara dan tidak disimpan ke Galeri.");
+        result.setText("Memotret eMMC untuk OCR...\nFoto hanya dipakai sementara dan tidak disimpan ke Galeri.");
         java.io.File file = new java.io.File(getCacheDir(), "emmc_ocr_" + System.currentTimeMillis() + ".jpg");
         ImageCapture.OutputFileOptions options =
                 new ImageCapture.OutputFileOptions.Builder(file).build();
@@ -2605,4 +2609,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {
         }
-        if (speechRecognizer != null) { try { speechRecognizer.destroy(); } catch (Exception ignored) {} }\n        super.onDestroy();\n    }\n}
+        if (speechRecognizer != null) { try { speechRecognizer.destroy(); } catch (Exception ignored) {} }
+        super.onDestroy();
+    }
+}
