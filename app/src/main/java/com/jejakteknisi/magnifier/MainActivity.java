@@ -1444,6 +1444,7 @@ public class MainActivity extends AppCompatActivity {
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
                     float dx=p[0]-a.x1, dy=p[1]-a.y1;
                     float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
+                    float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
                     paint.setTextSize(dp((int)(18 + a.size)) * scale);
                     paint.setTypeface(Typeface.DEFAULT_BOLD);
                     float textW=paint.measureText(a.text==null?"":a.text);
