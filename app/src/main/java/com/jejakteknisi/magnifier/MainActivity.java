@@ -578,7 +578,16 @@ public class MainActivity extends AppCompatActivity {
         line.setOnClickListener(v -> setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"));
         rect.setOnClickListener(v -> setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"));
         highlight.setOnClickListener(v -> setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"));
-        crop.setOnClickListener(v -> setAnnotationMode(AnnotationMode.CROP, "Crop aktif • tarik kotak pada area yang ingin dipotong"));
+        crop.setOnClickListener(v -> {
+            if (annotationMode == AnnotationMode.CROP && annotationView != null && annotationView.cropSelecting) {
+                applyCropSelection(annotationView.cropStartX, annotationView.cropStartY, annotationView.cropEndX, annotationView.cropEndY);
+                crop.setText("✂\nCrop");
+            } else if (annotationView != null) {
+                annotationView.beginCrop();
+                setAnnotationMode(AnnotationMode.CROP, "Crop aktif • geser kotak atau tarik sudut, lalu tekan ✓ Crop untuk menerapkan");
+                crop.setText("✓\nTerapkan");
+            }
+        });
         rotate.setOnClickListener(v -> rotateFrozenImage());
         adjust.setOnClickListener(v -> showImageAdjustDialog());
         resetView.setOnClickListener(v -> { frozenZoom=1f; frozenPanX=0f; frozenPanY=0f; if(zoomBar!=null) zoomBar.setProgress(0); updateFrozenImage(); status.setText("Tampilan gambar di-reset"); });
@@ -717,10 +726,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void cropToCurrentView() {
-        // Dipertahankan untuk kompatibilitas internal; tombol Crop sekarang
-        // memakai seleksi kotak langsung di atas gambar.
         if (annotationView != null) {
-            setAnnotationMode(AnnotationMode.CROP, "Crop aktif • tarik kotak pada area yang ingin dipotong");
+            annotationView.beginCrop();
+            setAnnotationMode(AnnotationMode.CROP, "Crop aktif • geser kotak atau tarik sudut, lalu terapkan");
         }
     }
 
@@ -1051,6 +1059,8 @@ public class MainActivity extends AppCompatActivity {
     private class AnnotationView extends View {
         private boolean cropSelecting=false;
         private float cropStartX, cropStartY, cropEndX, cropEndY;
+        private int cropDragMode=0; // 1 move, 2 TL, 3 TR, 4 BL, 5 BR, 6 T, 7 R, 8 B, 9 L
+        private float cropLastX, cropLastY;
 
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final java.util.ArrayList<Annotation> items = new java.util.ArrayList<>();
@@ -1137,6 +1147,23 @@ public class MainActivity extends AppCompatActivity {
             invalidate();
         }
 
+        void beginCrop() {
+            if (getWidth() <= 0 || getHeight() <= 0 || frozenBitmap == null) return;
+            float[] p1 = sourceToView(0, 0);
+            float[] p2 = sourceToView(frozenBitmap.getWidth(), frozenBitmap.getHeight());
+            float il = Math.max(0, Math.min(p1[0], p2[0]));
+            float it = Math.max(0, Math.min(p1[1], p2[1]));
+            float ir = Math.min(getWidth(), Math.max(p1[0], p2[0]));
+            float ib = Math.min(getHeight(), Math.max(p1[1], p2[1]));
+            float w = ir - il, h = ib - it;
+            if (w < 40 || h < 40) { il=8; it=8; ir=getWidth()-8; ib=getHeight()-8; w=ir-il; h=ib-it; }
+            float marginX=w*0.12f, marginY=h*0.12f;
+            cropStartX=il+marginX; cropStartY=it+marginY;
+            cropEndX=ir-marginX; cropEndY=ib-marginY;
+            cropSelecting=true; cropDragMode=0;
+            invalidate();
+        }
+
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             drawAnnotations(canvas);
@@ -1156,6 +1183,17 @@ public class MainActivity extends AppCompatActivity {
                 float thirdW=(r-l)/3f, thirdH=(b-t)/3f;
                 canvas.drawLine(l+thirdW,t,l+thirdW,b,cp); canvas.drawLine(l+2*thirdW,t,l+2*thirdW,b,cp);
                 canvas.drawLine(l,t+thirdH,r,t+thirdH,cp); canvas.drawLine(l,t+2*thirdH,r,t+2*thirdH,cp);
+                // 8 handle: 4 sudut + 4 sisi, lebih mudah untuk crop presisi.
+                cp.setStyle(Paint.Style.FILL); cp.setColor(Color.WHITE);
+                float hs=dp(12);
+                float[] hx={l,r,l,r,(l+r)/2f,r,(l+r)/2f,l};
+                float[] hy={t,t,b,b,t,(t+b)/2f,b,(t+b)/2f};
+                for(int i=0;i<8;i++) canvas.drawRoundRect(hx[i]-hs/2,hy[i]-hs/2,hx[i]+hs/2,hy[i]+hs/2,dp(2),dp(2),cp);
+                cp.setStyle(Paint.Style.STROKE); cp.setStrokeWidth(dp(2)); cp.setColor(Color.WHITE);
+                canvas.drawRect(l,t,r,b,cp);
+                cp.setStyle(Paint.Style.FILL); cp.setColor(Color.argb(220,255,255,255));
+                cp.setTextSize(dp(12)); cp.setTypeface(Typeface.DEFAULT_BOLD);
+                canvas.drawText("GESER AREA • TARIK 8 TITIK • ✓ TERAPKAN", Math.max(8,l), Math.max(dp(18),t-dp(8)), cp);
             }
         }
 
@@ -1345,17 +1383,53 @@ public class MainActivity extends AppCompatActivity {
         if (mode==AnnotationMode.TEXT && e.getActionMasked()==MotionEvent.ACTION_UP) { showTextInput(x,y); return true; }
             if (mode==AnnotationMode.MARKER && e.getActionMasked()==MotionEvent.ACTION_UP) { float[] p=viewToSource(x,y); pushUndo(); items.add(Annotation.marker(p[0],p[1],currentColor,strokeDp)); invalidate(); return true; }
             if (mode==AnnotationMode.CROP) {
+                float l=Math.min(cropStartX,cropEndX), t=Math.min(cropStartY,cropEndY);
+                float r=Math.max(cropStartX,cropEndX), b=Math.max(cropStartY,cropEndY);
+                float handle=dp(28);
                 switch(e.getActionMasked()) {
                     case MotionEvent.ACTION_DOWN:
-                        cropSelecting=true; cropStartX=x; cropStartY=y; cropEndX=x; cropEndY=y; invalidate(); return true;
+                        cropLastX=x; cropLastY=y;
+                        if (Math.hypot(x-l,y-t)<=handle) cropDragMode=2;
+                        else if (Math.hypot(x-r,y-t)<=handle) cropDragMode=3;
+                        else if (Math.hypot(x-l,y-b)<=handle) cropDragMode=4;
+                        else if (Math.hypot(x-r,y-b)<=handle) cropDragMode=5;
+                        else if (Math.abs(y-t)<=handle && x>=l && x<=r) cropDragMode=6;
+                        else if (Math.abs(x-r)<=handle && y>=t && y<=b) cropDragMode=7;
+                        else if (Math.abs(y-b)<=handle && x>=l && x<=r) cropDragMode=8;
+                        else if (Math.abs(x-l)<=handle && y>=t && y<=b) cropDragMode=9;
+                        else if (x>=l && x<=r && y>=t && y<=b) cropDragMode=1;
+                        else cropDragMode=0;
+                        cropSelecting=true; invalidate(); return true;
                     case MotionEvent.ACTION_MOVE:
-                        if(cropSelecting){ cropEndX=x; cropEndY=y; invalidate(); } return true;
+                        if(!cropSelecting || cropDragMode==0) return true;
+                        float dx=x-cropLastX, dy=y-cropLastY;
+                        float nl=l, nt=t, nr=r, nb=b;
+                        if(cropDragMode==1){ nl+=dx; nr+=dx; nt+=dy; nb+=dy; }
+                        else if(cropDragMode==2){ nl+=dx; nt+=dy; }
+                        else if(cropDragMode==3){ nr+=dx; nt+=dy; }
+                        else if(cropDragMode==4){ nl+=dx; nb+=dy; }
+                        else if(cropDragMode==5){ nr+=dx; nb+=dy; }
+                        else if(cropDragMode==6){ nt+=dy; }
+                        else if(cropDragMode==7){ nr+=dx; }
+                        else if(cropDragMode==8){ nb+=dy; }
+                        else if(cropDragMode==9){ nl+=dx; }
+                        float min=dp(50);
+                        if(nr-nl<min){ if(cropDragMode==2||cropDragMode==4) nl=nr-min; else nr=nl+min; }
+                        if(nb-nt<min){ if(cropDragMode==2||cropDragMode==3) nt=nb-min; else nb=nt+min; }
+                        float maxW=getWidth(), maxH=getHeight();
+                        if(cropDragMode==1){
+                            if(nl<0){nr-=nl;nl=0;} if(nr>maxW){nl-=nr-maxW;nr=maxW;}
+                            if(nt<0){nb-=nt;nt=0;} if(nb>maxH){nt-=nb-maxH;nb=maxH;}
+                        } else {
+                            nl=Math.max(0,nl); nt=Math.max(0,nt); nr=Math.min(maxW,nr); nb=Math.min(maxH,nb);
+                            if(nr-nl<min){ if(cropDragMode==2||cropDragMode==4||cropDragMode==9) nl=Math.max(0,nr-min); else nr=Math.min(maxW,nl+min); }
+                            if(nb-nt<min){ if(cropDragMode==2||cropDragMode==3||cropDragMode==6) nt=Math.max(0,nb-min); else nb=Math.min(maxH,nt+min); }
+                        }
+                        cropStartX=nl; cropStartY=nt; cropEndX=nr; cropEndY=nb;
+                        cropLastX=x; cropLastY=y; invalidate(); return true;
                     case MotionEvent.ACTION_UP:
-                        if(cropSelecting){ cropEndX=x; cropEndY=y; cropSelecting=false; invalidate();
-                            if(Math.abs(cropEndX-cropStartX)>20 && Math.abs(cropEndY-cropStartY)>20){ applyCropSelection(cropStartX,cropStartY,cropEndX,cropEndY); }
-                            else status.setText("Crop batal • tarik kotak lebih besar");
-                        } return true;
-                    case MotionEvent.ACTION_CANCEL: cropSelecting=false; invalidate(); return true;
+                    case MotionEvent.ACTION_CANCEL:
+                        cropDragMode=0; invalidate(); return true;
                 }
                 return true;
             }
