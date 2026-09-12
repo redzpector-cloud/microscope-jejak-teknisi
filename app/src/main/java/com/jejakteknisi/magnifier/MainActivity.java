@@ -6,6 +6,7 @@ import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -62,6 +63,7 @@ import androidx.core.view.WindowInsetsCompat;
 public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
+    private static final int GALLERY_PICK = 101;
 
     private PreviewView preview;
     private ImageCapture capture;
@@ -86,6 +88,7 @@ public class MainActivity extends AppCompatActivity {
     private ScaleGestureDetector frozenScaleDetector;
     private final Matrix frozenMatrix = new Matrix();
     private Button detailBtn;
+    private Button galleryBtn;
     private Button autoExposureBtn;
     private SeekBar detailBar;
     private TextView detailText;
@@ -196,7 +199,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         TextView title = new TextView(this);
-        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.0");
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.2");
         title.setTextColor(Color.WHITE);
         title.setTextSize(18);
         title.setGravity(Gravity.CENTER_VERTICAL);
@@ -212,9 +215,13 @@ public class MainActivity extends AppCompatActivity {
                 )
         );
 
+        galleryBtn = makeButton("🖼️\nGaleri");
+        galleryBtn.setTextSize(12);
+        top.addView(galleryBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
+
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(13);
-        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(92), dp(58)));
+        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
 
         root.addView(top);
 
@@ -361,6 +368,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         autoExposureBtn.setOnClickListener(v -> setExposure(0));
+        galleryBtn.setOnClickListener(v -> openGallery());
+
         detailBtn.setOnClickListener(v -> {
             detailOn = !detailOn;
             detailBtn.setText(detailOn ? "DETAIL\nON" : "DETAIL\nOFF");
@@ -418,6 +427,65 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+
+    private void openGallery() {
+        if (frozen) {
+            status.setText("Kembali ke LIVE sebelum membuka Galeri");
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, GALLERY_PICK);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != GALLERY_PICK || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try {
+            getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        } catch (Exception ignored) {}
+        try {
+            android.graphics.BitmapFactory.Options opts = new android.graphics.BitmapFactory.Options();
+            opts.inPreferredConfig = Bitmap.Config.ARGB_8888;
+            Bitmap bitmap;
+            try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+                bitmap = BitmapFactory.decodeStream(in, null, opts);
+            }
+            if (bitmap == null) { status.setText("Foto Galeri tidak dapat dibuka"); return; }
+            frozenBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+            bitmap.recycle();
+            frozen = true;
+            frozenZoom = 1f;
+            frozenPanX = 0f;
+            frozenPanY = 0f;
+            freezeView = new ImageView(this);
+            freezeView.setImageBitmap(frozenBitmap);
+            freezeView.setScaleType(ImageView.ScaleType.MATRIX);
+            freezeView.setBackgroundColor(Color.BLACK);
+            freezeView.setOnTouchListener((v, event) -> {
+                if (!frozen || annotationMode != AnnotationMode.NONE) return false;
+                frozenScaleDetector.onTouchEvent(event);
+                if (event.getPointerCount() == 1) {
+                    switch (event.getActionMasked()) {
+                        case MotionEvent.ACTION_DOWN: lastTouchX=event.getX(); lastTouchY=event.getY(); return true;
+                        case MotionEvent.ACTION_MOVE: frozenPanX += event.getX()-lastTouchX; frozenPanY += event.getY()-lastTouchY; lastTouchX=event.getX(); lastTouchY=event.getY(); updateFrozenImage(); return true;
+                    }
+                }
+                return true;
+            });
+            FrameLayout parent = cameraBox;
+            parent.addView(freezeView, new FrameLayout.LayoutParams(-1, -1));
+            zoomBar.setProgress(0);
+            showAnnotationTools();
+            setFreezeFullscreen(true);
+            status.setText("🖼️ GALERI • pilih alat untuk mengedit PCB");
+        } catch (Exception e) {
+            status.setText("Gagal membuka foto Galeri");
+        }
+    }
 
     private void showAnnotationTools() {
         if (annotationBar != null) return;
