@@ -1326,13 +1326,13 @@ public class MainActivity extends AppCompatActivity {
             float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
             paint.setColor(a.color);
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(dp((int)a.size) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+            paint.setStrokeWidth(dp((int)a.size) * scale);
             paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setTextSize(dp((int)(18 + a.size)) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+            paint.setTextSize(dp((int)(18 + a.size)) * scale);
             paint.setTypeface(Typeface.DEFAULT_BOLD);
             if (a.type==AnnotationMode.PEN) {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(dp((int)a.size) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setStrokeWidth(dp((int)a.size) * scale);
                 paint.setStrokeCap(Paint.Cap.ROUND);
                 if (a.points != null && a.points.size() > 1) {
                     Path path = new Path();
@@ -1347,7 +1347,7 @@ public class MainActivity extends AppCompatActivity {
                 float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
                 canvas.rotate(a.rotation, cx, cy);
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
-                double ang=Math.atan2(a.y2-a.y1,a.x2-a.x1); float len=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                double ang=Math.atan2(a.y2-a.y1,a.x2-a.x1); float len=dp(18) * scale;
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang-.45),a.y2-len*(float)Math.sin(ang-.45),paint);
                 canvas.drawLine(a.x2,a.y2,a.x2-len*(float)Math.cos(ang+.45),a.y2-len*(float)Math.sin(ang+.45),paint);
                 canvas.restore();
@@ -1357,18 +1357,18 @@ public class MainActivity extends AppCompatActivity {
                 // Technician jumper: visible insulated wire plus two pad endpoints.
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeCap(Paint.Cap.ROUND);
-                paint.setStrokeWidth(dp(6) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setStrokeWidth(dp(6) * scale);
                 paint.setColor(a.color);
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
                 paint.setStyle(Paint.Style.FILL);
-                float rr = dp(7) / Math.max(0.35f, frozenMatrix.mapRadius(1f));
+                float rr = dp(7) * scale;
                 canvas.drawCircle(a.x1,a.y1,rr,paint);
                 canvas.drawCircle(a.x2,a.y2,rr,paint);
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(dp(2) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setStrokeWidth(dp(2) * scale);
                 paint.setColor(Color.WHITE);
-                canvas.drawCircle(a.x1,a.y1,rr+dp(2)/Math.max(0.35f, frozenMatrix.mapRadius(1f)),paint);
-                canvas.drawCircle(a.x2,a.y2,rr+dp(2)/Math.max(0.35f, frozenMatrix.mapRadius(1f)),paint);
+                canvas.drawCircle(a.x1,a.y1,rr+dp(2) * scale,paint);
+                canvas.drawCircle(a.x2,a.y2,rr+dp(2) * scale,paint);
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.RECT) {
@@ -1376,7 +1376,7 @@ public class MainActivity extends AppCompatActivity {
             } else if (a.type==AnnotationMode.HIGHLIGHT) {
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeCap(Paint.Cap.ROUND);
-                paint.setStrokeWidth(dp(22) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setStrokeWidth(dp(22) * scale);
                 paint.setColor(a.color == Color.RED || a.color == Color.YELLOW || a.color == Color.GREEN || a.color == Color.CYAN ? a.color : Color.YELLOW);
                 paint.setAlpha(105);
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
@@ -1389,12 +1389,12 @@ public class MainActivity extends AppCompatActivity {
                 canvas.restore();
             } else if (a.type==AnnotationMode.OCR) {
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(dp(2) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setStrokeWidth(dp(2) * scale);
                 canvas.drawRect(new RectF(a.x1, a.y1, a.x2, a.y2), paint);
                 paint.setStyle(Paint.Style.FILL);
-                paint.setTextSize(dp(14) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setTextSize(dp(14) * scale);
                 paint.setShadowLayer(dp(3), 1, 1, Color.BLACK);
-                canvas.drawText(a.text, a.x1, Math.max(a.y1 - dp(3) / Math.max(0.35f, frozenMatrix.mapRadius(1f)), a.y1), paint);
+                canvas.drawText(a.text, a.x1, Math.max(a.y1 - dp(3) * scale, a.y1), paint);
                 paint.clearShadowLayer();
             }
         }
@@ -1444,7 +1444,7 @@ public class MainActivity extends AppCompatActivity {
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
                     float dx=p[0]-a.x1, dy=p[1]-a.y1;
                     float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
-                    paint.setTextSize(dp((int)(18 + a.size)) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                    paint.setTextSize(dp((int)(18 + a.size)) * scale);
                     paint.setTypeface(Typeface.DEFAULT_BOLD);
                     float textW=paint.measureText(a.text==null?"":a.text);
                     float textH=paint.getTextSize();
@@ -1946,6 +1946,9 @@ public class MainActivity extends AppCompatActivity {
         frozenMatrix.setScale(scale, scale);
         frozenMatrix.postTranslate(centerX, centerY);
         freezeView.setImageMatrix(frozenMatrix);
+        // Annotations live in source-image coordinates and share this exact matrix.
+        // Repaint immediately whenever zoom/pan changes so every mark follows the PCB.
+        if (annotationView != null) annotationView.invalidate();
 
         zoomText.setText(String.format("Freeze Zoom %.1f×", frozenZoom));
         status.setText(String.format("❄️ BEKU • %.1f× • geser untuk melihat area", frozenZoom));
