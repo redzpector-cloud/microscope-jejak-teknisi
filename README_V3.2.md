@@ -1,3 +1,5 @@
+V3.2.8 • Jumper Tool + Pinch Zoom
+
 # Jejak Teknisi Microscope V3.2
 
 Tahap V3.2 fokus pada Editor Gambar teknisi.
@@ -27,4 +29,6 @@ Catatan build: proyek menggunakan Android Gradle Plugin/AndroidX dan workflow Gi
 - Jalur mengikuti transformasi zoom/pan gambar seperti anotasi lainnya.
 
 
-V3.2.6 LIVE UI: top and bottom control bars auto-hide after inactivity; tapping the microscope preview reveals them; tapping controls does not reveal them. LIVE keeps the screen awake.
+V3.2.7 LIVE UI: only the top/header and adjustment panels auto-hide after inactivity.
+The bottom action bar (Lampu, Beku, Foto, Fokus, Grid and +/-) stays visible at all times.
+Tapping the microscope preview reveals the top controls; tapping bottom controls never reveals the top UI. LIVE keeps the screen awake.

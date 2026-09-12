@@ -132,7 +132,7 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout cameraBox;
     private AnnotationView annotationView;
     private LinearLayout annotationBar;
-    private enum AnnotationMode { NONE, SELECT, PEN, MARKER, ARROW, LINE, CIRCLE, RECT, HIGHLIGHT, TEXT, OCR, CROP }
+    private enum AnnotationMode { NONE, SELECT, PEN, MARKER, ARROW, LINE, CIRCLE, RECT, HIGHLIGHT, TEXT, OCR, CROP, JUMPER }
     private AnnotationMode annotationMode = AnnotationMode.NONE;
 
     private int dp(int value) {
@@ -617,7 +617,8 @@ public class MainActivity extends AppCompatActivity {
         Button rotate = makeButton("⟳\nPutar");
         Button adjust = makeButton("☀\nAtur");
         Button resetView = makeButton("⌖\nReset");
-        Button[] row3 = {line, rect, highlight, crop, rotate, adjust, resetView};
+        Button jumper = makeButton("⚡\nJumper");
+        Button[] row3 = {line, rect, highlight, crop, rotate, adjust, resetView, jumper};
         for (Button b : row3) {
             b.setTextSize(9);
             toolRow3.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
@@ -650,6 +651,7 @@ public class MainActivity extends AppCompatActivity {
         line.setOnClickListener(v -> setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"));
         rect.setOnClickListener(v -> setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"));
         highlight.setOnClickListener(v -> setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"));
+        jumper.setOnClickListener(v -> setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tap pad awal lalu tap pad tujuan • 2 jari untuk zoom"));
         crop.setOnClickListener(v -> {
             if (annotationMode == AnnotationMode.CROP && annotationView != null && annotationView.cropSelecting) {
                 applyCropSelection(annotationView.cropStartX, annotationView.cropStartY, annotationView.cropEndX, annotationView.cropEndY);
@@ -1173,11 +1175,28 @@ public class MainActivity extends AppCompatActivity {
         private float lastTransformDistance = 0f;
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> undoStack = new java.util.ArrayDeque<>();
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> redoStack = new java.util.ArrayDeque<>();
+        private ScaleGestureDetector jumperScaleDetector;
+        private boolean jumperPinching = false;
 
         AnnotationView(Context context) {
             super(context);
             setBackground(new ColorDrawable(Color.TRANSPARENT));
             setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            jumperScaleDetector = new ScaleGestureDetector(context, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                @Override public boolean onScaleBegin(ScaleGestureDetector detector) {
+                    jumperPinching = true;
+                    return true;
+                }
+                @Override public boolean onScale(ScaleGestureDetector detector) {
+                    if (!frozen || frozenBitmap == null) return false;
+                    frozenZoom = Math.max(1f, Math.min(8f, frozenZoom * detector.getScaleFactor()));
+                    updateFrozenImage();
+                    return true;
+                }
+                @Override public void onScaleEnd(ScaleGestureDetector detector) {
+                    jumperPinching = false;
+                }
+            });
         }
 
         void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; invalidate(); }
@@ -1262,9 +1281,13 @@ public class MainActivity extends AppCompatActivity {
         @Override protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
             drawAnnotations(canvas);
-            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER && mode != AnnotationMode.SELECT && mode != AnnotationMode.PEN && mode != AnnotationMode.CROP) {
+            if (drawing && mode != AnnotationMode.TEXT && mode != AnnotationMode.MARKER && mode != AnnotationMode.SELECT && mode != AnnotationMode.PEN && mode != AnnotationMode.CROP && mode != AnnotationMode.JUMPER) {
                 float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
                 drawOne(canvas, Annotation.shape(mode,a[0],a[1],b[0],b[1],currentColor,strokeDp));
+            }
+            if (drawing && mode == AnnotationMode.JUMPER) {
+                float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
+                drawOne(canvas, Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],Color.YELLOW,Math.max(4f,strokeDp)));
             }
             if (mode == AnnotationMode.CROP && cropSelecting) {
                 Paint cp = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1330,6 +1353,22 @@ public class MainActivity extends AppCompatActivity {
                 canvas.restore();
             } else if (a.type==AnnotationMode.LINE) {
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
+            } else if (a.type==AnnotationMode.JUMPER) {
+                // Technician jumper: visible insulated wire plus two pad endpoints.
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeCap(Paint.Cap.ROUND);
+                paint.setStrokeWidth(dp(6) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setColor(a.color);
+                canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
+                paint.setStyle(Paint.Style.FILL);
+                float rr = dp(7) / Math.max(0.35f, frozenMatrix.mapRadius(1f));
+                canvas.drawCircle(a.x1,a.y1,rr,paint);
+                canvas.drawCircle(a.x2,a.y2,rr,paint);
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(dp(2) / Math.max(0.35f, frozenMatrix.mapRadius(1f)));
+                paint.setColor(Color.WHITE);
+                canvas.drawCircle(a.x1,a.y1,rr+dp(2)/Math.max(0.35f, frozenMatrix.mapRadius(1f)),paint);
+                canvas.drawCircle(a.x2,a.y2,rr+dp(2)/Math.max(0.35f, frozenMatrix.mapRadius(1f)),paint);
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.RECT) {
@@ -1398,6 +1437,8 @@ public class MainActivity extends AppCompatActivity {
                     float rx=(float)(cx+(p[0]-cx)*cs-(p[1]-cy)*sn);
                     float ry=(float)(cy+(p[0]-cx)*sn+(p[1]-cy)*cs);
                     if (distancePointToSegment(rx,ry,a.x1,a.y1,a.x2,a.y2)<=tolerance) return a;
+                } else if (a.type==AnnotationMode.JUMPER) {
+                    if (distancePointToSegment(p[0],p[1],a.x1,a.y1,a.x2,a.y2)<=tolerance*1.5f) return a;
                 } else if (a.type==AnnotationMode.TEXT) {
                     // Rotate the touch point back around the text anchor before hit testing.
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
@@ -1421,6 +1462,30 @@ public class MainActivity extends AppCompatActivity {
         @Override public boolean onTouchEvent(MotionEvent e) {
             if (!frozen || mode==AnnotationMode.NONE) return false;
             float x=e.getX(), y=e.getY();
+            if (mode == AnnotationMode.JUMPER) {
+                jumperScaleDetector.onTouchEvent(e);
+                if (jumperPinching || e.getPointerCount() > 1) {
+                    if (e.getActionMasked() == MotionEvent.ACTION_UP || e.getActionMasked() == MotionEvent.ACTION_CANCEL) jumperPinching = false;
+                    return true;
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    startX=x; startY=y; endX=x; endY=y; drawing=true; invalidate(); return true;
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_MOVE && drawing) {
+                    endX=x; endY=y; invalidate(); return true;
+                }
+                if (e.getActionMasked() == MotionEvent.ACTION_UP && drawing) {
+                    endX=x; endY=y;
+                    float[] a=viewToSource(startX,startY), b=viewToSource(endX,endY);
+                    float distance=(float)Math.hypot(b[0]-a[0], b[1]-a[1]);
+                    if (distance >= dp(8)) {
+                        pushUndo();
+                        items.add(Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],Color.YELLOW,Math.max(4f,strokeDp)));
+                    }
+                    drawing=false; invalidate(); return true;
+                }
+                return true;
+            }
             if (mode==AnnotationMode.SELECT) {
                 int action=e.getActionMasked();
                 if (action==MotionEvent.ACTION_DOWN) {
@@ -1583,19 +1648,23 @@ public class MainActivity extends AppCompatActivity {
 
         int v = visible ? View.VISIBLE : View.GONE;
 
-        // LIVE auto-hide ONLY affects the top UI.
-        // The bottom control bar must ALWAYS remain visible in LIVE mode:
-        // Lamp, Photo, Focus, Grid, Freeze and Zoom controls stay accessible.
+        // LIVE auto-hide: ONLY the top/header and adjustment panels are hidden.
+        // The bottom action bar is intentionally ALWAYS visible in LIVE so the
+        // technician can reach Lampu, Beku, Foto, Fokus, Grid and +/- at any time.
         if (topBar != null) topBar.setVisibility(v);
         if (infoRow != null) infoRow.setVisibility(v);
         if (zoomBar != null) zoomBar.setVisibility(v);
         if (exposureRow != null) exposureRow.setVisibility(v);
         if (detailRow != null) detailRow.setVisibility(v);
 
-        // Never change controlsBar or any bottom-button visibility here.
-        // Pressing a bottom button therefore cannot make the hidden top UI appear;
-        // only a touch on the microscope preview calls showLivePanelTemporarily().
-        if (!frozen && controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
+        if (controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
+        if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(View.VISIBLE);
+        if (freezeBtn != null) freezeBtn.setVisibility(View.VISIBLE);
+        if (overlayBtn != null) overlayBtn.setVisibility(View.VISIBLE);
+        if (cameraPlusBtn != null) cameraPlusBtn.setVisibility(View.VISIBLE);
+        if (torchBtn != null) torchBtn.setVisibility(View.VISIBLE);
+        if (photoBtn != null) photoBtn.setVisibility(View.VISIBLE);
+        if (cameraFocusBtn != null) cameraFocusBtn.setVisibility(View.VISIBLE);
     }
 
     private void scheduleLivePanelHide() {
