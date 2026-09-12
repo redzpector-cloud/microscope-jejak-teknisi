@@ -11,6 +11,8 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -112,6 +114,10 @@ public class MainActivity extends AppCompatActivity {
     private Button overlayBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
+    // LIVE camera control panel auto-hide
+    private final Handler livePanelHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideLivePanelRunnable = () -> setLivePanelVisible(false);
+    private boolean livePanelVisible = true;
 
     // V3.0 Crosshair + Grid overlay
     private OverlayView overlayView;
@@ -340,6 +346,8 @@ public class MainActivity extends AppCompatActivity {
                 new LinearLayout.LayoutParams(-1, -2);
         root.addView(controls, controlParams);
         setContentView(root);
+        // Keep the LIVE preview clean; controls reappear with a tap.
+        scheduleLivePanelHide();
 
         frozenScaleDetector = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
             @Override public boolean onScale(ScaleGestureDetector detector) {
@@ -385,24 +393,24 @@ public class MainActivity extends AppCompatActivity {
                     else setZoomFromProgress(progress);
                 }
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { showLivePanelTemporarily(); }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { scheduleLivePanelHide(); }
         });
 
         exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) setExposure(progress - 4);
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { showLivePanelTemporarily(); }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { scheduleLivePanelHide(); }
         });
 
         detailBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 detailText.setText("Ultra Detail " + progress + "%");
             }
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {}
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { showLivePanelTemporarily(); }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { scheduleLivePanelHide(); }
         });
 
         autoExposureBtn.setOnClickListener(v -> setExposure(0));
@@ -419,9 +427,11 @@ public class MainActivity extends AppCompatActivity {
 
         minus.setOnClickListener(v -> {
             if (frozen) changeFrozenZoom(-0.5f); else changeZoom(-0.5f);
+            showLivePanelTemporarily();
         });
         plus.setOnClickListener(v -> {
             if (frozen) changeFrozenZoom(0.5f); else changeZoom(0.5f);
+            showLivePanelTemporarily();
         });
         torchBtn.setOnClickListener(v -> toggleTorch());
         freezeBtn.setOnClickListener(v -> toggleFreeze());
@@ -429,6 +439,7 @@ public class MainActivity extends AppCompatActivity {
             if (preview != null) {
                 focusAt(preview.getWidth() / 2f, preview.getHeight() / 2f);
             }
+            showLivePanelTemporarily();
         });
         photoBtn.setOnClickListener(v -> takePhoto());
         overlayBtn.setOnClickListener(v -> showOverlaySettings());
@@ -464,6 +475,7 @@ public class MainActivity extends AppCompatActivity {
             liveScaleDetector.onTouchEvent(event);
             switch (event.getActionMasked()) {
                 case MotionEvent.ACTION_DOWN:
+                    showLivePanelTemporarily();
                     liveDownX = event.getX();
                     liveDownY = event.getY();
                     livePinching = false;
@@ -1564,6 +1576,28 @@ public class MainActivity extends AppCompatActivity {
         Annotation copy(){ Annotation a=new Annotation(); a.type=type; a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.text=text;a.color=color;a.size=size;a.rotation=rotation; if(points!=null){a.points=new ArrayList<>(); for(PointF p:points)a.points.add(new PointF(p.x,p.y));} return a; }
     }
 
+    private void setLivePanelVisible(boolean visible) {
+        livePanelVisible = visible;
+        if (frozen) visible = true;
+        int v = visible ? View.VISIBLE : View.GONE;
+        if (infoRow != null) infoRow.setVisibility(v);
+        if (zoomBar != null) zoomBar.setVisibility(v);
+        if (exposureRow != null) exposureRow.setVisibility(v);
+        if (detailRow != null) detailRow.setVisibility(v);
+        if (controlsBar != null) controlsBar.setVisibility(v);
+    }
+
+    private void scheduleLivePanelHide() {
+        livePanelHandler.removeCallbacks(hideLivePanelRunnable);
+        if (!frozen) livePanelHandler.postDelayed(hideLivePanelRunnable, 3000);
+    }
+
+    private void showLivePanelTemporarily() {
+        if (frozen) return;
+        setLivePanelVisible(true);
+        scheduleLivePanelHide();
+    }
+
     private void applySystemBarInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(android.R.id.content), (v, insets) -> {
             Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -1627,6 +1661,8 @@ public class MainActivity extends AppCompatActivity {
                 updateZoomText();
                 setExposure(0);
                 status.setText(detailOn ? "Kamera LIVE • Ultra Detail ON" : "Kamera LIVE • Detail normal");
+                setLivePanelVisible(true);
+                scheduleLivePanelHide();
 
             } catch (Exception e) {
                 status.setText("Kamera gagal");
@@ -1700,6 +1736,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setFreezeFullscreen(boolean freezeMode) {
+        livePanelHandler.removeCallbacks(hideLivePanelRunnable);
+        if (freezeMode) setLivePanelVisible(true);
         if (topBar != null) topBar.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
         if (status != null) status.setVisibility(freezeMode ? View.GONE : View.VISIBLE);
 
@@ -1728,6 +1766,7 @@ public class MainActivity extends AppCompatActivity {
             freezeBtn.setLayoutParams(lp);
         }
         updateControlsBarPadding();
+        if (!freezeMode) scheduleLivePanelHide();
     }
 
     private void toggleFreeze() {
