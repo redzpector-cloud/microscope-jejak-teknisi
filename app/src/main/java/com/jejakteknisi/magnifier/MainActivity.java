@@ -637,10 +637,12 @@ public class MainActivity extends AppCompatActivity {
         Button[] opts = {red, yellow, green, blue, small, medium, large};
         optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.7f));
         for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(22), .55f));
+        // Keep the editor compact; color/size options appear only when needed.
+        optionRow.setVisibility(View.GONE);
 
-        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(40)));
-        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(30)));
-        annotationBar.addView(toolRow3, new LinearLayout.LayoutParams(-1, dp(30)));
+        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(36)));
+        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(27)));
+        annotationBar.addView(toolRow3, new LinearLayout.LayoutParams(-1, dp(27)));
         annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
 
         pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
@@ -691,6 +693,19 @@ public class MainActivity extends AppCompatActivity {
         medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
 
+        // Color/size controls are contextual so the PCB preview stays large.
+        pen.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.PEN, "Pen aktif • gambar bebas pada PCB"); });
+        arrow.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"); });
+        circle.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"); });
+        line.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"); });
+        rect.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"); });
+        highlight.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"); });
+        jumper.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tap pad awal lalu tap pad tujuan • 2 jari untuk zoom"); });
+        text.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"); });
+        select.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • tarik handle untuk ubah ukuran • 2 jari untuk putar"); });
+        pan.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"); });
+        ocr.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); detectOcrOnFrozenImage(); });
+
         // In Freeze mode the editing toolbar moves into the former Exposure area.
         // Zoom and Detail controls are hidden so the microscope preview becomes taller.
         annotationView = new AnnotationView(this);
@@ -705,7 +720,7 @@ public class MainActivity extends AppCompatActivity {
         zoomBar.setVisibility(View.GONE);
         detailRow.setVisibility(View.GONE);
 
-        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(124));
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT);
         rootLayout.addView(annotationBar, exposureIndex, barParams);
     }
 
@@ -1364,7 +1379,7 @@ public class MainActivity extends AppCompatActivity {
          */
         private float[] annotationViewBounds(Annotation a) {
             if (a == null) return new float[]{0,0,0,0};
-            float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
+            float scale = Math.max(0.05f, frozenMatrix.mapRadius(1f));
             float padView = dp(12);
             float pad = padView / scale;
             float minX, minY, maxX, maxY;
@@ -1377,14 +1392,27 @@ public class MainActivity extends AppCompatActivity {
                 }
                 pad += a.size * 0.5f;
             } else if (a.type==AnnotationMode.TEXT) {
+                // Text bounds are computed in VIEW pixels so zoom does not enlarge the label.
                 Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
                 tp.setTypeface(Typeface.DEFAULT_BOLD);
-                tp.setTextSize(dp((int)(18 + a.size)));
+                float textPx = dp((int)(18 + a.size));
+                tp.setTextSize(textPx / scale);
                 String txt=a.text==null?"":a.text;
-                float tw=tp.measureText(txt);
-                float th=tp.getTextSize();
-                minX=a.x1; maxX=a.x1+tw; minY=a.y1-th; maxY=a.y1;
-                pad = dp(6)/scale;
+                float twSrc=tp.measureText(txt);
+                float thSrc=tp.getTextSize();
+                float[] anchor=sourceToView(a.x1,a.y1);
+                float halfPad=dp(6);
+                float[] vx={anchor[0], anchor[0]+twSrc*scale, anchor[0]+twSrc*scale, anchor[0]};
+                float[] vy={anchor[1]-thSrc*scale, anchor[1]-thSrc*scale, anchor[1], anchor[1]};
+                float cxV=anchor[0], cyV=anchor[1];
+                float radV=(float)Math.toRadians(a.rotation), csV=(float)Math.cos(radV), snV=(float)Math.sin(radV);
+                minX=Float.POSITIVE_INFINITY; minY=Float.POSITIVE_INFINITY; maxX=Float.NEGATIVE_INFINITY; maxY=Float.NEGATIVE_INFINITY;
+                for(int i=0;i<4;i++){
+                    float dx=vx[i]-cxV, dy=vy[i]-cyV;
+                    float rxV=cxV+dx*csV-dy*snV, ryV=cyV+dx*snV+dy*csV;
+                    minX=Math.min(minX,rxV); maxX=Math.max(maxX,rxV); minY=Math.min(minY,ryV); maxY=Math.max(maxY,ryV);
+                }
+                return new float[]{minX-halfPad,minY-halfPad,maxX+halfPad,maxY+halfPad};
             } else if (a.type==AnnotationMode.MARKER) {
                 float rr=dp((int)a.size);
                 minX=a.x1-rr; maxX=a.x1+rr; minY=a.y1-rr; maxY=a.y1;
@@ -1436,12 +1464,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         private void drawOneSource(Canvas canvas, Annotation a) {
-            float scale = Math.max(0.35f, Math.min(4f, frozenMatrix.mapRadius(1f)));
+            float scale = Math.max(0.05f, frozenMatrix.mapRadius(1f));
             paint.setColor(a.color);
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(dp((int)a.size) * scale);
             paint.setStrokeCap(Paint.Cap.ROUND);
-            paint.setTextSize(dp((int)(18 + a.size)) * scale);
+            paint.setTextSize(dp((int)(18 + a.size)) / scale);
             paint.setTypeface(Typeface.DEFAULT_BOLD);
             if (a.type==AnnotationMode.PEN) {
                 paint.setStyle(Paint.Style.STROKE);
@@ -1495,10 +1523,15 @@ public class MainActivity extends AppCompatActivity {
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
                 paint.setAlpha(255);
             } else if (a.type==AnnotationMode.TEXT) {
+                // Text is anchored in SOURCE coordinates but rendered at a fixed VIEW size.
+                // This keeps labels readable while zooming/panning the frozen PCB image.
                 paint.setStyle(Paint.Style.FILL);
+                paint.setTextSize(dp((int)(18 + a.size)) / scale);
                 canvas.save();
                 canvas.rotate(a.rotation, a.x1, a.y1);
-                paint.setShadowLayer(dp(3),1,1,Color.BLACK); canvas.drawText(a.text,a.x1,a.y1,paint); paint.clearShadowLayer();
+                paint.setShadowLayer(dp(3) / scale, 1f / scale, 1f / scale, Color.BLACK);
+                canvas.drawText(a.text == null ? "" : a.text, a.x1, a.y1, paint);
+                paint.clearShadowLayer();
                 canvas.restore();
             } else if (a.type==AnnotationMode.OCR) {
                 paint.setStyle(Paint.Style.STROKE);
@@ -1561,15 +1594,18 @@ public class MainActivity extends AppCompatActivity {
                         if(distancePointToSegment(tx,ty,a.x2,a.y2,ax,ay)<=tol || distancePointToSegment(tx,ty,a.x2,a.y2,bx,by)<=tol) return a;
                     }
                 } else if (a.type==AnnotationMode.TEXT) {
+                    // Hit-test text in VIEW space so the label keeps a constant screen size.
+                    float[] av=sourceToView(a.x1,a.y1);
+                    float dxv=vx-av[0], dyv=vy-av[1];
                     double r=Math.toRadians(-a.rotation), cs=Math.cos(r), sn=Math.sin(r);
-                    float dx=p[0]-a.x1, dy=p[1]-a.y1;
-                    float rx=(float)(dx*cs-dy*sn), ry=(float)(dx*sn+dy*cs);
+                    float rx=(float)(dxv*cs-dyv*sn), ry=(float)(dxv*sn+dyv*cs);
                     Paint tp=new Paint(Paint.ANTI_ALIAS_FLAG);
                     tp.setTypeface(Typeface.DEFAULT_BOLD);
-                    tp.setTextSize(dp((int)(18+a.size)));
+                    float textPx=dp((int)(18+a.size));
+                    tp.setTextSize(textPx);
                     float textW=tp.measureText(a.text==null?"":a.text), textH=tp.getTextSize();
-                    float tol=tolerance;
-                    if(rx>=-tol && rx<=textW+tol && ry>=-textH-tol && ry<=tol) return a;
+                    float tolV=dp(14);
+                    if(rx>=-tolV && rx<=textW+tolV && ry>=-textH-tolV && ry<=tolV) return a;
                 } else if (a.type==AnnotationMode.CIRCLE) {
                     float l=Math.min(a.x1,a.x2), r=Math.max(a.x1,a.x2), t=Math.min(a.y1,a.y2), b=Math.max(a.y1,a.y2);
                     float cx=(l+r)/2f, cy=(t+b)/2f, rx=Math.max(1f,(r-l)/2f), ry=Math.max(1f,(b-t)/2f);
