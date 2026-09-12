@@ -34,7 +34,7 @@ The bottom action bar (Lampu, Beku, Foto, Fokus, Grid and +/-) stays visible at 
 Tapping the microscope preview reveals the top controls; tapping bottom controls never reveals the top UI. LIVE keeps the screen awake.
 
 
-## V3.2.9 Editor transform
+## V3.3.0 Editor transform
 - Semua anotasi disimpan dalam koordinat gambar/source.
 - Zoom dan pan memakai Matrix yang sama untuk gambar dan anotasi.
 - Ukuran visual tanda ikut membesar/mengecil saat zoom.

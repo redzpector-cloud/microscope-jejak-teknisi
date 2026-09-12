@@ -1320,6 +1320,47 @@ public class MainActivity extends AppCompatActivity {
             canvas.concat(frozenMatrix);
             for (Annotation a:items) drawOneSource(canvas,a);
             canvas.restore();
+            if (mode == AnnotationMode.SELECT && selected != null) drawSelectionOverlay(canvas, selected);
+        }
+
+        private void drawSelectionOverlay(Canvas canvas, Annotation a) {
+            float[] box = annotationViewBounds(a);
+            float l=box[0], t=box[1], r=box[2], b=box[3];
+            Paint sp = new Paint(Paint.ANTI_ALIAS_FLAG);
+            sp.setStyle(Paint.Style.STROKE);
+            sp.setStrokeWidth(dp(2));
+            sp.setColor(Color.WHITE);
+            sp.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(6),dp(4)},0));
+            canvas.drawRect(l,t,r,b,sp);
+            sp.setPathEffect(null);
+            sp.setStyle(Paint.Style.FILL);
+            sp.setColor(Color.YELLOW);
+            float hs=dp(10);
+            canvas.drawCircle(l,t,hs,sp); canvas.drawCircle(r,t,hs,sp);
+            canvas.drawCircle(l,b,hs,sp); canvas.drawCircle(r,b,hs,sp);
+            canvas.drawCircle((l+r)/2f,t,dp(6),sp);
+            canvas.drawCircle((l+r)/2f,b,dp(6),sp);
+            canvas.drawCircle(l,(t+b)/2f,dp(6),sp);
+            canvas.drawCircle(r,(t+b)/2f,dp(6),sp);
+            // Rotation handle.
+            float ry=t-dp(28);
+            sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
+            canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
+            sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
+        }
+
+        private float[] annotationViewBounds(Annotation a) {
+            float minX, minY, maxX, maxY;
+            if (a.type==AnnotationMode.PEN && a.points!=null && !a.points.isEmpty()) {
+                minX=maxX=a.points.get(0).x; minY=maxY=a.points.get(0).y;
+                for(PointF p:a.points){minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x); minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);}
+            } else {
+                minX=Math.min(a.x1,a.x2); maxX=Math.max(a.x1,a.x2); minY=Math.min(a.y1,a.y2); maxY=Math.max(a.y1,a.y2);
+            }
+            float pad=dp(14);
+            float[] pts={minX-pad,minY-pad,maxX+pad,maxY+pad};
+            frozenMatrix.mapRect(new RectF(pts[0],pts[1],pts[2],pts[3]));
+            return new float[]{Math.max(0,pts[0]),Math.max(0,pts[1]),Math.min(getWidth(),pts[2]),Math.min(getHeight(),pts[3])};
         }
 
         private void drawOneSource(Canvas canvas, Annotation a) {
@@ -1529,7 +1570,11 @@ public class MainActivity extends AppCompatActivity {
                     if (!moveHistoryPushed) { pushUndo(); moveHistoryPushed=true; }
                     float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y);
                     float dx=p2[0]-p1[0], dy=p2[1]-p1[1];
-                    selected.x1+=dx; selected.y1+=dy; selected.x2+=dx; selected.y2+=dy;
+                    if (selected.type==AnnotationMode.PEN && selected.points!=null) {
+                        for(PointF pt:selected.points){ pt.x+=dx; pt.y+=dy; }
+                    } else {
+                        selected.x1+=dx; selected.y1+=dy; selected.x2+=dx; selected.y2+=dy;
+                    }
                     lastSelectX=x; lastSelectY=y;
                     invalidate();
                     return true;
