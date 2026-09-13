@@ -2617,11 +2617,19 @@ public class MainActivity extends AppCompatActivity {
         title.setTypeface(null, Typeface.BOLD);
         header.addView(title, new LinearLayout.LayoutParams(0, dp(40), 1));
         TextView count = new TextView(this);
-        count.setText(all.size() + " kode unik");
+        count.setText(all.size() + " kode");
         count.setTextColor(Color.LTGRAY);
-        count.setTextSize(12);
+        count.setTextSize(11);
         count.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        header.addView(count, new LinearLayout.LayoutParams(dp(100), dp(40)));
+        header.addView(count, new LinearLayout.LayoutParams(dp(62), dp(40)));
+
+        Button hafalBtn = makeButton("📚 HAFAL");
+        hafalBtn.setTextSize(10);
+        hafalBtn.setPadding(dp(5), 0, dp(5), 0);
+        LinearLayout.LayoutParams hp = new LinearLayout.LayoutParams(dp(82), dp(40));
+        hp.leftMargin = dp(6);
+        header.addView(hafalBtn, hp);
+        hafalBtn.setOnClickListener(v -> showGradeMemorization());
         panel.addView(header);
 
         LinearLayout searchRow = new LinearLayout(this);
@@ -2944,15 +2952,16 @@ public class MainActivity extends AppCompatActivity {
             @Override public void onResults(Bundle results) {
                 ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (list != null && !list.isEmpty()) {
-                    String spoken = list.get(0).toUpperCase(Locale.US);
-                    // Normalisasi suara untuk kode eMMC: hilangkan spasi/tanda baca.
-                    spoken = normalizeSpokenEmmc(spoken);
+                    String bestSpoken = list.get(0);
+                    String spoken = normalizeSpokenEmmc(bestSpoken);
+                    // Coba semua hasil recognition dan pilih yang paling dekat dengan
+                    // part number database. Ini jauh lebih cocok untuk kode seperti KMQX8000SA.
+                    String corrected = bestDatabaseVoiceMatch(list);
+                    if (corrected != null && !corrected.isEmpty()) spoken = corrected;
                     target.setText(spoken);
                     target.setSelection(target.length());
                     Toast.makeText(MainActivity.this, "VOICE: " + spoken, Toast.LENGTH_SHORT).show();
-                    // Jalankan pencarian otomatis setelah suara diterima.
                     target.clearFocus();
-                    target.postDelayed(() -> target.getRootView().findFocus(), 50);
                 }
             }
             @Override public void onPartialResults(Bundle partialResults) {}
@@ -2977,42 +2986,177 @@ public class MainActivity extends AppCompatActivity {
     private String normalizeSpokenEmmc(String text) {
         if (text == null) return "";
         String s = text.toUpperCase(Locale.US).trim();
-        // Speech recognizer sering mengubah angka/huruf kode menjadi kata.
-        String[] words = {
-                "ZERO","OH","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
-                "ZERO","SATU","DUA","TIGA","EMPAT","LIMA","ENAM","TUJUH","DELAPAN","SEMBILAN"
+        s = s.replaceAll("[^A-Z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+        if (s.isEmpty()) return "";
+
+        // Bentuk angka yang sering keluar dari voice recognition.
+        String[] phrases = {
+                "DOUBLE ZERO", "TRIPLE ZERO", "DOUBLE O", "TRIPLE O",
+                "ONE THOUSAND", "TWO THOUSAND", "THREE THOUSAND", "FOUR THOUSAND",
+                "FIVE THOUSAND", "SIX THOUSAND", "SEVEN THOUSAND", "EIGHT THOUSAND", "NINE THOUSAND",
+                "TEN THOUSAND"
         };
-        String[] nums = {
-                "0","0","1","2","3","4","5","6","7","8","9",
-                "0","1","2","3","4","5","6","7","8","9"
+        String[] values = {"00", "000", "00", "000", "1000", "2000", "3000", "4000", "5000", "6000", "7000", "8000", "9000", "10000"};
+        for (int i = 0; i < phrases.length; i++) s = s.replace(phrases[i], values[i]);
+
+        // Huruf alfabet yang umum dibaca oleh recognizer sebagai kata.
+        String[] letters = {
+                "AY", "BEE", "SEE", "SEA", "DEE", "EE", "EF", "JAY", "KAY", "EL", "EM", "EN",
+                "PEE", "CUE", "ARE", "ESS", "TEE", "YOU", "VEE", "DOUBLE YOU", "EX", "WHY", "ZEE", "ZED"
         };
-        for (int i = 0; i < words.length; i++) {
-            s = s.replaceAll("\\b" + words[i] + "\\b", nums[i]);
-        }
-        // Common recognizer substitutions for letter names.
-        s = s.replaceAll("\\b(AY|EYE)\\b", "I");
-        s = s.replaceAll("\\b(BEE)\\b", "B");
-        s = s.replaceAll("\\b(SEE|SEA)\\b", "C");
-        s = s.replaceAll("\\b(DEE)\\b", "D");
-        s = s.replaceAll("\\b(E)\\b", "E");
-        s = s.replaceAll("\\b(EF)\\b", "F");
-        s = s.replaceAll("\\b(JAY)\\b", "J");
-        s = s.replaceAll("\\b(KAY)\\b", "K");
-        s = s.replaceAll("\\b(EL)\\b", "L");
-        s = s.replaceAll("\\b(EM)\\b", "M");
-        s = s.replaceAll("\\b(EN)\\b", "N");
-        s = s.replaceAll("\\b(PEE)\\b", "P");
-        s = s.replaceAll("\\b(CUE|Q)\\b", "Q");
-        s = s.replaceAll("\\b(ARE)\\b", "R");
-        s = s.replaceAll("\\b(ESS)\\b", "S");
-        s = s.replaceAll("\\b(TEE)\\b", "T");
-        s = s.replaceAll("\\b(U)\\b", "U");
-        s = s.replaceAll("\\b(VEE)\\b", "V");
-        s = s.replaceAll("\\b(DOUBLE YOU)\\b", "W");
-        s = s.replaceAll("\\b(EX)\\b", "X");
-        s = s.replaceAll("\\b(WHY)\\b", "Y");
-        s = s.replaceAll("\\b(ZEE|ZED)\\b", "Z");
+        String[] letterValues = {
+                "A", "B", "C", "C", "D", "E", "F", "J", "K", "L", "M", "N",
+                "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "Z"
+        };
+        for (int i = 0; i < letters.length; i++) s = s.replaceAll("\\b" + letters[i] + "\\b", letterValues[i]);
+
+        // Bahasa Indonesia dan Inggris untuk angka tunggal.
+        String[] words = {"ZERO","OH","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
+                "SATU","DUA","TIGA","EMPAT","LIMA","ENAM","TUJUH","DELAPAN","SEMBILAN"};
+        String[] nums = {"0","0","1","2","3","4","5","6","7","8","9",
+                "1","2","3","4","5","6","7","8","9"};
+        for (int i = 0; i < words.length; i++) s = s.replaceAll("\\b" + words[i] + "\\b", nums[i]);
+
+        // Angka belasan yang kadang muncul saat teknisi menyebut kapasitas/kode.
+        String[] teens = {"TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"};
+        for (int i = 0; i < teens.length; i++) s = s.replaceAll("\\b" + teens[i] + "\\b", String.valueOf(10 + i));
+
         return s.replaceAll("[^A-Z0-9]", "");
+    }
+
+    private String bestDatabaseVoiceMatch(ArrayList<String> recognitionResults) {
+        ArrayList<EmmcRecord> all = loadEmmcDatabase();
+        if (all.isEmpty()) return null;
+        String bestPart = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (String raw : recognitionResults) {
+            String q = normalizeSpokenEmmc(raw);
+            if (q.length() < 4) continue;
+            for (EmmcRecord r : all) {
+                String part = normalizeEmmc(r.part);
+                if (part.isEmpty()) continue;
+                if (q.equals(part) || q.contains(part) || part.contains(q)) return r.part;
+                int d = levenshtein(q, part);
+                int threshold = part.length() >= 10 ? 2 : 1;
+                if (d <= threshold && d < bestDistance) {
+                    bestDistance = d;
+                    bestPart = r.part;
+                }
+            }
+        }
+        return bestPart;
+    }
+
+    private int levenshtein(String a, String b) {
+        int[] prev = new int[b.length() + 1];
+        int[] cur = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) prev[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            cur[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            int[] tmp = prev; prev = cur; cur = tmp;
+        }
+        return prev[b.length()];
+    }
+
+    private void showGradeMemorization() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(16), dp(12), dp(16), dp(10));
+        root.setBackgroundColor(Color.rgb(3, 20, 38));
+
+        TextView title = new TextView(this);
+        title.setText("📚 CARA CEPAT HAPAL GRADE");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setTypeface(null, Typeface.BOLD);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        TextView sub = new TextView(this);
+        sub.setText("Pilih brand untuk melihat rumus, lalu latihan sampai hafal.");
+        sub.setTextColor(Color.LTGRAY);
+        sub.setTextSize(12);
+        sub.setPadding(0, 0, 0, dp(8));
+        root.addView(sub);
+
+        LinearLayout brandBox = new LinearLayout(this);
+        brandBox.setOrientation(LinearLayout.VERTICAL);
+        addGradeBrandButton(brandBox, "SAMSUNG", "A = 16GB • B = 32GB • C = 64GB • D = 128GB • E = 256GB • F = 512GB", 0, "SAMSUNG");
+        addGradeBrandButton(brandBox, "TOSHIBA", "7 = 16GB • 8 = 32GB • 9 = 64GB", 1, "TOSHIBA");
+        addGradeBrandButton(brandBox, "ASUS", "H26M 4/5/6/7 • H28U 6/7/8 • YMEC/YMUS", 2, "ASUS");
+        addGradeBrandButton(brandBox, "SK HYNIX", "32/64_65/17_18/26_27/52_53/15_16/21_22", 3, "SK HYNIX");
+        root.addView(brandBox, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        Button quiz = makeButton("🎯  TEBAK GRADE");
+        quiz.setTextSize(14);
+        root.addView(quiz, new LinearLayout.LayoutParams(-1, dp(50)));
+        quiz.setOnClickListener(v -> showGradeQuiz());
+
+        new AlertDialog.Builder(this).setView(root).setPositiveButton("Tutup", null).show();
+    }
+
+    private void addGradeBrandButton(LinearLayout parent, String name, String desc, int index, String key) {
+        Button b = makeButton(name + "\n" + desc);
+        b.setTextSize(11);
+        b.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        b.setPadding(dp(14), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(62));
+        lp.setMargins(0, dp(4), 0, dp(4));
+        parent.addView(b, lp);
+        b.setOnClickListener(v -> showGradeReference(key));
+    }
+
+    private void showGradeReference(String brand) {
+        String text;
+        if ("SAMSUNG".equals(brand)) {
+            text = "SAMSUNG\n\nA  = 16 GB\nB  = 32 GB\nC  = 64 GB\nD  = 128 GB\nE  = 256 GB\nF  = 512 GB\n\n💡 Hafalan: A-B-C-D-E-F naik berurutan 16-32-64-128-256-512 GB.";
+        } else if ("TOSHIBA".equals(brand)) {
+            text = "TOSHIBA\n\n7 = 16 GB\n8 = 32 GB\n9 = 64 GB\n\n💡 Hafalan: 7-8-9 naik satu angka, kapasitas ikut 16-32-64 GB.";
+        } else if ("ASUS".equals(brand)) {
+            text = "ASUS\n\nH26M 4 = 8 GB\nH26M 5 = 16 GB\nH26M 6 = 32 GB\nH26M 7 = 64 GB\n\nH28U 6 = 32 GB\nH28U 7 = 64 GB\nH28U 8 = 128 GB\n\nYMEC C6 = 32 GB\nC7 = 64 GB\nC8 = 128 GB\nC9 = 256 GB\n\nYMUS 6 = 32 GB\n7 = 64 GB\n8 = 128 GB\n9 = 256 GB.";
+        } else {
+            text = "SK HYNIX\n\n32 = 4 GB\n64_65 = 8 GB\n17_18 = 16 GB\n26_27 = 32 GB\n26_27Ab = 2/32 GB\n52_53 = 64 GB\n15_16 = 128 GB\n21_22 = 256 GB.";
+        }
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(15);
+        t.setPadding(dp(18), dp(14), dp(18), dp(14));
+        new AlertDialog.Builder(this).setTitle("Rumus Cepat Grade").setView(t).setPositiveButton("Tutup", null).show();
+    }
+
+    private void showGradeQuiz() {
+        final String[][] q = {
+                {"KLM A", "16 GB", "SAMSUNG"}, {"KLM C", "64 GB", "SAMSUNG"},
+                {"KLM E", "256 GB", "SAMSUNG"}, {"Thgbmbg 8", "32 GB", "TOSHIBA"},
+                {"H26M 6", "32 GB", "ASUS"}, {"H28U 8", "128 GB", "ASUS"},
+                {"C9", "256 GB", "YMEC/YMUS"}, {"21_22", "256 GB", "SK HYNIX"}
+        };
+        final int[] pos = {0};
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(16), dp(8), dp(16), dp(8));
+        TextView question = new TextView(this);
+        question.setTextSize(24); question.setTextColor(Color.WHITE); question.setGravity(Gravity.CENTER); question.setTypeface(null, Typeface.BOLD);
+        box.addView(question, new LinearLayout.LayoutParams(-1, dp(90)));
+        TextView ask = new TextView(this);
+        ask.setTextColor(Color.LTGRAY); ask.setTextSize(13); ask.setGravity(Gravity.CENTER);
+        box.addView(ask, new LinearLayout.LayoutParams(-1, dp(40)));
+        LinearLayout answers = new LinearLayout(this); answers.setOrientation(LinearLayout.VERTICAL); box.addView(answers);
+        TextView score = new TextView(this); score.setTextColor(Color.rgb(130, 210, 255)); score.setGravity(Gravity.CENTER); score.setPadding(0, dp(10), 0, 0); box.addView(score);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("🎯 Tebak Grade").setView(box).setNegativeButton("Tutup", null).create();
+        Runnable render = new Runnable() { public void run() {
+            if (pos[0] >= q.length) { question.setText("🎉 Selesai!"); ask.setText("Latihan selesai — ulangi untuk menguatkan hafalan."); answers.removeAllViews(); score.setText("Skor latihan selesai"); return; }
+            question.setText(q[pos[0]][0]); ask.setText("Brand: " + q[pos[0]][2] + "\nBerapa kapasitasnya?"); answers.removeAllViews();
+            String[] opts = {"8 GB", "16 GB", "32 GB", "64 GB", "128 GB", "256 GB", "512 GB"};
+            for (String opt : opts) { Button b = makeButton(opt); b.setTextSize(13); answers.addView(b, new LinearLayout.LayoutParams(-1, dp(44))); b.setOnClickListener(v -> { boolean ok = opt.equals(q[pos[0]][1]); Toast.makeText(MainActivity.this, ok ? "✅ Benar!" : "❌ Belum tepat — jawabannya " + q[pos[0]][1], Toast.LENGTH_SHORT).show(); pos[0]++; run(); }); }
+            score.setText((pos[0] + 1) + " / " + q.length);
+        }};
+        dialog.setOnShowListener(d -> render.run());
+        dialog.show();
     }
 
     private void scanEmmcOcr(EditText target, TextView result) {
