@@ -127,6 +127,9 @@ public class MainActivity extends AppCompatActivity {
     private int navigationBarBottomInset = 0;
     private int exposureLower = -4;
     private int exposureUpper = 4;
+    // V3.7: preserve Live camera tuning across preview restarts
+    private float lastLiveZoom = 1f;
+    private int lastLiveExposure = 0;
     // LIVE camera control panel auto-hide
     private final Handler livePanelHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideLivePanelRunnable = () -> setLivePanelVisible(false);
@@ -2122,7 +2125,14 @@ public class MainActivity extends AppCompatActivity {
                 exposureUpper = expRange.getUpper();
                 int expSpan = Math.max(1, exposureUpper - exposureLower);
                 exposureBar.setMax(expSpan);
-                setExposure(0);
+                // Restore the user's previous zoom/exposure after a detail-mode restart.
+                android.util.Range<Float> zoomRange = camera.getCameraInfo().getZoomState().getValue() != null
+                        ? new android.util.Range<>(1f, camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio())
+                        : new android.util.Range<>(1f, 1f);
+                float restoreZoom = Math.max(zoomRange.getLower(), Math.min(zoomRange.getUpper(), lastLiveZoom));
+                camera.getCameraControl().setZoomRatio(restoreZoom);
+                lastLiveZoom = restoreZoom;
+                setExposure(lastLiveExposure);
                 status.setText(detailOn ? "Kamera LIVE • Ultra Detail ON" : "Kamera LIVE • Detail normal");
                 setLivePanelVisible(true);
                 scheduleLivePanelHide();
@@ -2167,6 +2177,7 @@ public class MainActivity extends AppCompatActivity {
 
         float ratio = 1f + (max - 1f) * progress / 100f;
         camera.getCameraControl().setZoomRatio(ratio);
+        lastLiveZoom = ratio;
         updateZoomText();
     }
 
@@ -2179,6 +2190,7 @@ public class MainActivity extends AppCompatActivity {
         float newZoom = Math.max(1f, Math.min(max, current + delta));
 
         camera.getCameraControl().setZoomRatio(newZoom);
+        lastLiveZoom = newZoom;
 
         if (max > 1f) {
             zoomBar.setProgress((int) ((newZoom - 1f) / (max - 1f) * 100f));
@@ -2195,6 +2207,7 @@ public class MainActivity extends AppCompatActivity {
         exposureUpper = range.getUpper();
         int clamped = Math.max(exposureLower, Math.min(exposureUpper, value));
         camera.getCameraControl().setExposureCompensationIndex(clamped);
+        lastLiveExposure = clamped;
         if (exposureBar != null) {
             exposureBar.setMax(Math.max(1, exposureUpper - exposureLower));
             exposureBar.setProgress(clamped - exposureLower);
