@@ -630,7 +630,7 @@ public class MainActivity extends AppCompatActivity {
             zoomBar.setProgress(0);
             showAnnotationTools();
             setFreezeFullscreen(true);
-            status.setText("🖼️ GALERI • pilih alat untuk mengedit PCB");
+            status.setText("✏️ EDITOR PRO V3.6 • foto Galeri siap diedit");
         } catch (Exception e) {
             status.setText("Gagal membuka foto Galeri");
         }
@@ -1029,7 +1029,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("PCB inspection tersimpan");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.6");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1126,7 +1126,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/jpeg");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil PCB"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB"));
     }
 
     private class OverlayView extends View {
