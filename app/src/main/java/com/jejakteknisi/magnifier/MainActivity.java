@@ -648,6 +648,15 @@ public class MainActivity extends AppCompatActivity {
         annotationBar.setPadding(dp(4), dp(3), dp(4), dp(3));
         annotationBar.setBackgroundColor(Color.rgb(22, 24, 27));
 
+        // V3.8: each editor row scrolls horizontally. This prevents the toolbar
+        // from becoming too dense on smaller phones while keeping every tool reachable.
+        HorizontalScrollView rowScroll1 = new HorizontalScrollView(this);
+        rowScroll1.setHorizontalScrollBarEnabled(false);
+        HorizontalScrollView rowScroll2 = new HorizontalScrollView(this);
+        rowScroll2.setHorizontalScrollBarEnabled(false);
+        HorizontalScrollView rowScroll3 = new HorizontalScrollView(this);
+        rowScroll3.setHorizontalScrollBarEnabled(false);
+
         LinearLayout toolRow1 = new LinearLayout(this);
         toolRow1.setOrientation(LinearLayout.HORIZONTAL);
         toolRow1.setGravity(Gravity.CENTER);
@@ -680,12 +689,12 @@ public class MainActivity extends AppCompatActivity {
         Button[] row1 = {pan, select, pen, marker, arrow, circle, text};
         for (Button b : row1) {
             b.setTextSize(10);
-            toolRow1.addView(b, new LinearLayout.LayoutParams(0, dp(38), 1f));
+            toolRow1.addView(b, new LinearLayout.LayoutParams(dp(72), dp(38)));
         }
         Button[] row2 = {ocr, undo, redo, duplicate, edit, clear, save, share};
         for (Button b : row2) {
             b.setTextSize(10);
-            toolRow2.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
+            toolRow2.addView(b, new LinearLayout.LayoutParams(dp(72), dp(30)));
         }
 
         Button line = makeButton("╱\nGaris");
@@ -699,7 +708,7 @@ public class MainActivity extends AppCompatActivity {
         Button[] row3 = {line, rect, highlight, crop, rotate, adjust, resetView, jumper};
         for (Button b : row3) {
             b.setTextSize(9);
-            toolRow3.addView(b, new LinearLayout.LayoutParams(0, dp(29), 1f));
+            toolRow3.addView(b, new LinearLayout.LayoutParams(dp(72), dp(30)));
         }
 
         Button red = makeButton("●");
@@ -713,14 +722,18 @@ public class MainActivity extends AppCompatActivity {
         legend.setTextSize(10);
 
         Button[] opts = {red, yellow, green, blue, small, medium, large};
-        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.7f));
+        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.55f));
         for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(22), .55f));
         // Keep the editor compact; color/size options appear only when needed.
         optionRow.setVisibility(View.GONE);
 
-        annotationBar.addView(toolRow1, new LinearLayout.LayoutParams(-1, dp(36)));
-        annotationBar.addView(toolRow2, new LinearLayout.LayoutParams(-1, dp(27)));
-        annotationBar.addView(toolRow3, new LinearLayout.LayoutParams(-1, dp(27)));
+        rowScroll1.addView(toolRow1, new HorizontalScrollView.LayoutParams(dp(504), dp(38)));
+        rowScroll2.addView(toolRow2, new HorizontalScrollView.LayoutParams(dp(576), dp(30)));
+        rowScroll3.addView(toolRow3, new HorizontalScrollView.LayoutParams(dp(576), dp(30)));
+
+        annotationBar.addView(rowScroll1, new LinearLayout.LayoutParams(-1, dp(38)));
+        annotationBar.addView(rowScroll2, new LinearLayout.LayoutParams(-1, dp(30)));
+        annotationBar.addView(rowScroll3, new LinearLayout.LayoutParams(-1, dp(30)));
         annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
 
         pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
