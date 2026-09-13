@@ -1,8 +1,273 @@
-# part_number,brand,capacity,grade,notes
-KLM8G1GETF-B041,Samsung,8GB,A+++,Starter database - tambah data teknisi
-KLMAG1JETD-B041,Samsung,16GB,A+++,Starter database - tambah data teknisi
-KLM4G1FETE-B041,Samsung,4GB,A+++,Starter database - tambah data teknisi
-THGBMNG5D1LBAIL,Kioxia/Toshiba,8GB,A+++,Starter database - tambah data teknisi
-H26M41203HPR,SK hynix,16GB,A+++,Starter database - tambah data teknisi
-SEM08G,Micron,8GB,A+++,Starter database - tambah data teknisi
-EMMC-V1-DEMO,Jejak Teknisi,Contoh,A+++,Template untuk pengisian database
+part_number,brand,capacity,grade,category,notes
+KLM8G1GETF-B041,Samsung,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+KLMAG1JETD-B041,Samsung,16GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+KLM4G1FETE-B041,Samsung,4GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+THGBMNG5D1LBAIL,Kioxia/Toshiba,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+H26M41203HPR,SK hynix,16GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+SEM08G,Micron,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
+EMMC-V1-DEMO,Jejak Teknisi,Contoh,A+++,Legacy / starter,Template untuk pengisian database
+H9HQ22AECMMD,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
+KM2B8001CM,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
+KM8F8001JM,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
+KM8F9001JM,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
+H9QTI6GDN6,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
+H9HP16AECMMDAR,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+h9hq15afamBD,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+H9HQ16AFAMMDAR,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+H9QTQG6CN6,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+H9QTOGECN6,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ103,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ150,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ151,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ152,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ187,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ266,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ385,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ386,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+JZ387,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM2L9001CM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM2V7001CM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM3V6001CA,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM3V6001CB,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM3V6001CM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMSL9000CM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMSV7001DM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM8L9001JA,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM8L9001IM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM8V7001IM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KM8V8001IM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMDL6001DA,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMDV6001DB,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMDV6001DM,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+KMWV50017M,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+SDNBDA4-128G,Tidak dicantumkan,128GB,A+++,A+++ 128,Sumber: file EMMC_database_teks_biasa
+H9AGG9SANB,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9HP52ACPMMD,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9HP52ADAMAD,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9HP52AECMMD,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9HP53ACPMMD,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9HQ52ADAMMD,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9TQ52ACLTMC,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9TQ53ACLTMC,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ049,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ052,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ053,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ090,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ109,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ128,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ168,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ177,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ186,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+JZ481,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KM2H7001CM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KM3H6001CA,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KM3H6001CM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMS5C7001DM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMSH7001DM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMSP8001DM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMDC6001DM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMDH6001DA,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMDH6001DM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMDP6001DA,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMDP6001DB,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMGP6001BM,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMRC10014M,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMRH60014A,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+KMRH60014M,Tidak dicantumkan,64GB,A+++,A+++ 64,Sumber: file EMMC_database_teks_biasa
+H9AGSGDMNB,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9HP26ACPMMD,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9HP27ADAMAD,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ26ACLTMCUR,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ26ADFTACUR,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ26ADFTBCUR,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ27ADFTMCUR,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KM4X60002M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMDD60018M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMDX60018M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMGD6001BM,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMGX6001BM,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMR21000BM,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMRD60014M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMRN1000BM,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMRX10014M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMRX60014M,Tidak dicantumkan,3/32GB,A+++,A+++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9HP27ABUMMD,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ26ABITMCUR,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ26ABLDMCUR,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+JZ013,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+JZ018,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+JZ050,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+JZ083,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KM4X6001KM,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMM4Z0001M,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMQ4Z0013M,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMQD60013M,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMQX10013M,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMR4Z0001A,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+KMR4Z0001M,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+NW27ADGTMC-18,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+SDADL28P-32G,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+TYROHH331667RB,Tidak dicantumkan,3/32GB,A++,A++ 3/32,Sumber: file EMMC_database_teks_biasa
+H9TQ17ABITACUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+H9TQ17ABITBCUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+H9TQ17ABITMCUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+H9TQ17ADFTACUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+H9TQ17ADFTMCUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+H9TQ18ABJTMCUR,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+JZ025,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMGE6001BM,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMQ310013M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMQ820013M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMQE10013M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMQE60013M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMR310001M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMR31000BA,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMRS80001M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMRSX0001A,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMRSX0001M,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMRE1000BM,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+KMQ310013B,Tidak dicantumkan,16GB,A++,A++ 16A,Sumber: file EMMC_database_teks_biasa
+16EMCP16-EL3BT527,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+16EMCP16-EL3CV100,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+16EMCP16-EL3DT527,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+16EMCP16-ML3BM500,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+16EMCP16-NL3DT527,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+16EMCP16-NL3E527,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+JY932,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+JY950,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+JZ008,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+SDADF4AP-16G,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+SDADL2AP-16G,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+TYEOHH221657RA,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+TYEOHH221658RA,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+TYEOHH221659RA,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+TYEOHH221668RA,Tidak dicantumkan,16GB,A++ / A+,A++ 16B / A+,Sumber: file EMMC_database_teks_biasa
+H9TP17ABLDMC,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+H9TP18ASJIDMC,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMF310012M,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMF520012M,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMFE10012M,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMFE60012M,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMKS8000VM,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMKSX000VM,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+KMQX8000SA,Tidak dicantumkan,Tidak dicantumkan,A+B,A+B,Sumber: file EMMC_database_teks_biasa
+16EMCP08-EL3BT527,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+H9TQ64ASGTACUR,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+H9TQ64ABGTMCUR,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+H9TQ64ABITMCUR,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+H9TQ65ASGTMCUR,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+JWA60,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+SD9DS28K-8G,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMF720012M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMFN10012M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMFN60012M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMFNX10012M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMK?C0000MA,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMK?U0000MA,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMK?X0000MM,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMK3U0000VM,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMK7X000VM,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ310006A,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ310006B,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ310006M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ310005M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ72000SM,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ7X000SA,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ7X000SM,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQ820005M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQN10005M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMQN10013M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMR7X0001M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+KMRN?0001M,Tidak dicantumkan,Tidak dicantumkan,A+,A+,Sumber: file EMMC_database_teks_biasa
+CBE06-2560CHAC,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+JZ242,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+klueg4r1de,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+KLUEGSUHDB,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+KLUEGSUHDC,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+JZ369,Tidak dicantumkan,256GB,Pilihan,Pilihan 256,Sumber: file EMMC_database_teks_biasa
+BWCTAK21X128G,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+FEMDNN128G-A3A56,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+H26T87001CMR,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+HAC09-1280BRAC,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+HNST061ZGK,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+HNST062EHK,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+JZ380,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+JZ496,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+JZ144,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLMDG4UCTA,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLMDG4UCTB,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLUDG4UIEA,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLUDG4UHDB,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLUDGS11EB,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+KLUDG4GIBD,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+PTE8A0HR-X28E,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+SDINADFA-128,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+THGAFSG9T43BAIR,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+THGAFSOT43BAIR,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+XBECC1A28A2TG?,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+YMECSA2TB1A2C3,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+THGBF7T0L8LBA,Tidak dicantumkan,128GB,Pilihan,Pilihan 128,Sumber: file EMMC_database_teks_biasa
+H26M74002HMR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+H26M78103CCR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+H26M78208CMR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+H28S7030BMR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+H28U74301AMR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+HN8G592EHK,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+JZ075,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+JZ160,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+JZ495,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+JZ528,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLMCG4JENB,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLMCG4jETD,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLMCG8GEND,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLMCG8WEBD,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLUCG4J1ED,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+KLUCG8G1BD,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+SDINADF4-64G,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+THGBMHG9C4LBAIR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+THGBF7G9L4LBATR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+THGBMBG9DSKBAIG,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+THGBMHG9C4LBAIL,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+THGLF2G9J8LBATR,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+YMEC7A2TB2A2C3,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+YMU?7B?E1A2C1,Tidak dicantumkan,64GB,Pilihan,Pilihan 64,Sumber: file EMMC_database_teks_biasa
+H26M64103EMR,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+H26M64208FMR,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+H28U64322MMR,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG21ENB,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG21ETD,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG4GEAC,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG4GEND,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG4WEBC,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLMBG4WEBD,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLUBG4G1BD,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+KLUBG1GICE,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+SDINADFA-32,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+THGBMBGSD4KBAIR,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+THGBMFG8C4LBAIR,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+UNMEN05GCIC31A3,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+YMECA6A?TB1A2C3,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+YMUS6A?TB1A2C3,Tidak dicantumkan,32GB,Pilihan,Pilihan 32,Sumber: file EMMC_database_teks_biasa
+EXYNOS,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+H26M5200EQR,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+H26M52103FMR,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+H26M52208FMR,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG1JENB,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG1JETD,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG2GEAC,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG2GEND,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG2WEMB,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KLMAG2WEPD,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+SDINADFA-16G,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THBGMF7C1LBAIL,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THGBMBG7D2KBAIL,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THGBMBG7D4KBAIR,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THGBMHG7C1LBAIL,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THGBMF7C2LBAIL,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+KM?U0001M,Tidak dicantumkan,16GB,Pilihan,Pilihan 16,Sumber: file EMMC_database_teks_biasa
+THGBM5G6A2JBAIR,Tidak dicantumkan,8GB,Pilihan,Pilihan 8GB,Sumber: file EMMC_database_teks_biasa
+KLM8G1WEMB-B031,Tidak dicantumkan,8GB,Pilihan,Pilihan 8GB,Sumber: file EMMC_database_teks_biasa
+KMQN10006M,Tidak dicantumkan,Tidak dicantumkan,A+ Samsung/A Khusus,A+ Samsung/A Khusus,Sumber: file EMMC_database_teks_biasa
+KMQN10006B,Tidak dicantumkan,Tidak dicantumkan,A+ Samsung/A Khusus,A+ Samsung/A Khusus,Sumber: file EMMC_database_teks_biasa
+KMFN60012A,Tidak dicantumkan,Tidak dicantumkan,A+ Samsung/A Khusus,A+ Samsung/A Khusus,Sumber: file EMMC_database_teks_biasa
+H9TQ64ABGTMC,Tidak dicantumkan,Tidak dicantumkan,A+ Samsung/A Khusus,A+ Samsung/A Khusus,Sumber: file EMMC_database_teks_biasa

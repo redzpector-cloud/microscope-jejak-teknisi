@@ -193,10 +193,6 @@ public class MainActivity extends AppCompatActivity {
         buildUi();
         applySystemBarInsets();
 
-        if (getIntent().getBooleanExtra("open_emmc", false)) {
-            new Handler(Looper.getMainLooper()).postDelayed(() -> showEmmcDatabase(), 250);
-        }
-
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
@@ -2470,12 +2466,15 @@ public class MainActivity extends AppCompatActivity {
                 if (p.length < 5) continue;
                 String part = normalizeEmmc(p[0]);
                 if (query.equals(part) || query.contains(part) || part.contains(query)) {
+                    String category = p.length >= 5 ? p[4] : "Tidak dicantumkan";
+                    String notes = p.length >= 6 ? p[5] : (p.length >= 5 ? p[4] : "");
                     return "eMMC DITEMUKAN\n\n"
                             + "Part Number : " + p[0] + "\n"
                             + "Brand       : " + p[1] + "\n"
                             + "Kapasitas   : " + p[2] + "\n"
                             + "Grade       : " + p[3] + "\n"
-                            + "Catatan     : " + p[4];
+                            + "Kategori    : " + category + "\n"
+                            + "Catatan     : " + notes;
                 }
             }
         } catch (Exception e) {

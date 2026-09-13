@@ -30,3 +30,7 @@ Workflow berada di `.github/workflows/main.yml`.
 - Google Lens direct intent now tries `google://lens` first, matching Chromium's current Lens contract, with `LensBitmapUriKey` and `ActivityLaunchTimestampNanos`.
 - No Android Share Sheet fallback.
 - Zoom text area enlarged to prevent clipping.
+
+
+## EMMC DATABASE V2
+Database eMMC telah digabung dengan file EMMC_database_teks_biasa. Kode duplikat dihapus berdasarkan kode ternormalisasi. Lihat `README_EMMC_DATABASE_V2.md`.
