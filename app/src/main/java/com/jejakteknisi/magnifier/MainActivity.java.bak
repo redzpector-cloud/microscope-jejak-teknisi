@@ -87,7 +87,6 @@ public class MainActivity extends AppCompatActivity {
     private PreviewView preview;
     private ImageCapture capture;
     private Camera camera;
-    private ProcessCameraProvider cameraProvider;
     private SeekBar zoomBar;
     private TextView zoomText;
     private TextView status;
@@ -134,17 +133,6 @@ public class MainActivity extends AppCompatActivity {
     private final Handler livePanelHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideLivePanelRunnable = () -> setLivePanelVisible(false);
     private boolean livePanelVisible = true;
-
-    // LIVE bottom sheet: draggable camera controls with snap positions.
-    private FrameLayout bottomSheetHost;
-    private TextView bottomSheetHandle;
-    private float bottomSheetDownY;
-    private int bottomSheetStartHeight;
-    private boolean bottomSheetMoved = false;
-    private static final int BOTTOM_SHEET_MIN_DP = 88;
-    private static final int BOTTOM_SHEET_START_DP = 96;
-    private static final int BOTTOM_SHEET_MID_DP = 122;
-    private static final int BOTTOM_SHEET_MAX_DP = 150;
 
     // V3.0 Crosshair + Grid overlay
     private OverlayView overlayView;
@@ -241,26 +229,38 @@ public class MainActivity extends AppCompatActivity {
         top.addView(
                 logoView,
                 new LinearLayout.LayoutParams(
-                        dp(44),
-                        dp(44)
+                        dp(52),
+                        dp(52)
                 )
         );
 
-        // Header dibuat ringkas: logo tetap ada, tulisan JEJAK TEKNISI di atas kamera dihilangkan
-        // agar area preview lebih luas.
-        top.addView(new View(this), new LinearLayout.LayoutParams(0, dp(44), 1));
+        TextView title = new TextView(this);
+        title.setText("JEJAK TEKNISI\nMICROSCOPE V3.2");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(18);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setPadding(dp(10), 0, 0, 0);
+
+        top.addView(
+                title,
+                new LinearLayout.LayoutParams(
+                        0,
+                        dp(58),
+                        1
+                )
+        );
 
         galleryBtn = makeButton("🖼️\nGaleri");
-        galleryBtn.setTextSize(11);
-        top.addView(galleryBtn, new LinearLayout.LayoutParams(dp(68), dp(48)));
+        galleryBtn.setTextSize(12);
+        top.addView(galleryBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
 
         detailBtn = makeButton("DETAIL\nON");
-        detailBtn.setTextSize(11);
-        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(68), dp(48)));
-
+        detailBtn.setTextSize(13);
+        top.addView(detailBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
         emmcDbBtn = makeButton("💾\neMMC DB");
-        emmcDbBtn.setTextSize(10);
-        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(72), dp(48)));
+        emmcDbBtn.setTextSize(11);
+        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(82), dp(58)));
 
         root.addView(top);
 
@@ -364,59 +364,9 @@ public class MainActivity extends AppCompatActivity {
         controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
         controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .55f));
 
-        // Bottom sheet host: tinggi berubah mengikuti drag sehingga preview kamera
-        // ikut membesar/mengecil. Ada 3 posisi snap: rendah, tengah, tinggi.
-        bottomSheetHost = new FrameLayout(this);
-        bottomSheetHost.setBackgroundColor(Color.rgb(10, 12, 14));
-        bottomSheetHost.setClipChildren(true);
-
-        bottomSheetHandle = new TextView(this);
-        bottomSheetHandle.setText("━");
-        bottomSheetHandle.setTextColor(Color.rgb(145, 155, 165));
-        bottomSheetHandle.setTextSize(18);
-        bottomSheetHandle.setGravity(Gravity.CENTER);
-        bottomSheetHost.addView(
-                bottomSheetHandle,
-                new FrameLayout.LayoutParams(-1, dp(18), Gravity.TOP)
-        );
-
-        FrameLayout.LayoutParams controlsParams =
-                new FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM);
-        bottomSheetHost.addView(controls, controlsParams);
-
-        root.addView(
-                bottomSheetHost,
-                new LinearLayout.LayoutParams(-1, dp(BOTTOM_SHEET_START_DP))
-        );
-
-        bottomSheetHandle.setOnTouchListener((v, event) -> {
-            switch (event.getActionMasked()) {
-                case MotionEvent.ACTION_DOWN:
-                    bottomSheetDownY = event.getRawY();
-                    bottomSheetStartHeight = bottomSheetHost.getLayoutParams().height;
-                    bottomSheetMoved = false;
-                    return true;
-
-                case MotionEvent.ACTION_MOVE:
-                    float dy = event.getRawY() - bottomSheetDownY;
-                    if (Math.abs(dy) > dp(3)) bottomSheetMoved = true;
-                    int minH = dp(BOTTOM_SHEET_MIN_DP);
-                    int maxH = dp(BOTTOM_SHEET_MAX_DP);
-                    int newH = bottomSheetStartHeight - (int) dy;
-                    newH = Math.max(minH, Math.min(maxH, newH));
-                    ViewGroup.LayoutParams lp = bottomSheetHost.getLayoutParams();
-                    lp.height = newH;
-                    bottomSheetHost.setLayoutParams(lp);
-                    return true;
-
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    snapBottomSheet();
-                    return true;
-            }
-            return true;
-        });
-
+        LinearLayout.LayoutParams controlParams =
+                new LinearLayout.LayoutParams(-1, -2);
+        root.addView(controls, controlParams);
         setContentView(root);
         // Keep the LIVE preview clean; controls reappear with a tap.
         scheduleLivePanelHide();
@@ -1951,37 +1901,6 @@ public class MainActivity extends AppCompatActivity {
         Annotation copy(){ Annotation a=new Annotation(); a.type=type; a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.text=text;a.color=color;a.size=size;a.rotation=rotation; if(points!=null){a.points=new ArrayList<>(); for(PointF p:points)a.points.add(new PointF(p.x,p.y));} return a; }
     }
 
-    private void snapBottomSheet() {
-        if (bottomSheetHost == null) return;
-
-        int current = bottomSheetHost.getLayoutParams().height;
-        int low = dp(BOTTOM_SHEET_MIN_DP) + navigationBarBottomInset;
-        int mid = dp(BOTTOM_SHEET_MID_DP) + navigationBarBottomInset;
-        int high = dp(BOTTOM_SHEET_MAX_DP) + navigationBarBottomInset;
-
-        int target = low;
-        int dLow = Math.abs(current - low);
-        int dMid = Math.abs(current - mid);
-        int dHigh = Math.abs(current - high);
-        if (dMid < dLow) target = mid;
-        if (dHigh < Math.min(dLow, dMid)) target = high;
-
-        ValueAnimator animator = ValueAnimator.ofInt(current, target);
-        animator.setDuration(220);
-        animator.addUpdateListener(a -> {
-            if (bottomSheetHost == null) return;
-            ViewGroup.LayoutParams lp = bottomSheetHost.getLayoutParams();
-            lp.height = (Integer) a.getAnimatedValue();
-            bottomSheetHost.setLayoutParams(lp);
-        });
-        animator.start();
-
-        if (bottomSheetHandle != null) {
-            bottomSheetHandle.setText(target == high ? "⌄" : (target == low ? "⌃" : "━"));
-        }
-        bottomSheetMoved = false;
-    }
-
     private void setLivePanelVisible(boolean visible) {
         livePanelVisible = visible;
         if (frozen) visible = true;
@@ -1997,7 +1916,6 @@ public class MainActivity extends AppCompatActivity {
         if (exposureRow != null) exposureRow.setVisibility(v);
         if (detailRow != null) detailRow.setVisibility(v);
 
-        if (bottomSheetHost != null) bottomSheetHost.setVisibility(View.VISIBLE);
         if (controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
         if (cameraMinusBtn != null) cameraMinusBtn.setVisibility(View.VISIBLE);
         if (freezeBtn != null) freezeBtn.setVisibility(View.VISIBLE);
@@ -2042,38 +1960,8 @@ public class MainActivity extends AppCompatActivity {
         if (controlsBar != null) {
             // Keep the bottom camera/edit controls above Android's navigation bar
             // in BOTH LIVE and FREEZE modes. setFreezeFullscreen() must not reset this.
-            int bottomPad = navigationBarBottomInset + dp(6);
-            controlsBar.setPadding(dp(4), dp(4), dp(4), bottomPad);
-
-            // The sheet content must grow with the system navigation inset so its
-            // buttons are never clipped when the phone uses a 3-button navigation bar.
-            ViewGroup.LayoutParams cp = controlsBar.getLayoutParams();
-            if (cp != null) {
-                cp.height = dp(78) + navigationBarBottomInset;
-                controlsBar.setLayoutParams(cp);
-            }
-
-            if (bottomSheetHost != null && !bottomSheetMoved) {
-                ViewGroup.LayoutParams hp = bottomSheetHost.getLayoutParams();
-                if (hp != null) {
-                    int minimum = dp(BOTTOM_SHEET_MIN_DP) + navigationBarBottomInset;
-                    int start = dp(BOTTOM_SHEET_START_DP) + navigationBarBottomInset;
-                    if (hp.height < minimum) hp.height = minimum;
-                    if (hp.height < start) hp.height = start;
-                    bottomSheetHost.setLayoutParams(hp);
-                }
-            }
+            controlsBar.setPadding(dp(4), dp(4), dp(4), navigationBarBottomInset + dp(6));
         }
-    }
-
-    private void stopCameraForDatabase() {
-        try {
-            if (cameraProvider != null) {
-                cameraProvider.unbindAll();
-            }
-        } catch (Exception ignored) {}
-        camera = null;
-        if (preview != null) preview.setVisibility(View.INVISIBLE);
     }
 
     private void startCamera() {
@@ -2085,7 +1973,6 @@ public class MainActivity extends AppCompatActivity {
         future.addListener(() -> {
             try {
                 ProcessCameraProvider provider = future.get();
-                cameraProvider = provider;
 
                 Preview.Builder previewBuilder = new Preview.Builder();
                 Camera2Interop.Extender<Preview> previewExtender = new Camera2Interop.Extender<>(previewBuilder);
@@ -2503,7 +2390,8 @@ public class MainActivity extends AppCompatActivity {
                 if (p.length < 5) continue;
                 String part = p[0].trim();
                 String key = normalizeEmmc(part);
-                if (key.isEmpty()) continue;
+                if (key.isEmpty() || seen.contains(key)) continue;
+                seen.add(key);
                 String brand = p.length > 1 ? p[1].trim() : "Tidak dicantumkan";
                 String capacity = p.length > 2 ? p[2].trim() : "Tidak dicantumkan";
                 String grade = p.length > 3 ? p[3].trim() : "Tidak dicantumkan";
@@ -2581,16 +2469,13 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // MODE FULL DATABASE: kamera benar-benar dihentikan agar seluruh layar
-        // dipakai untuk database eMMC, bukan ditampilkan di belakang dialog.
-        stopCameraForDatabase();
-        if (cameraBox != null) cameraBox.setVisibility(View.GONE);
+        // Database tetap berada di atas kamera LIVE, tetapi status/header kamera disembunyikan
+        // agar tidak bertabrakan dengan status bar HP.
         if (topBar != null) topBar.setVisibility(View.GONE);
         if (infoRow != null) infoRow.setVisibility(View.GONE);
         if (zoomBar != null) zoomBar.setVisibility(View.GONE);
         if (exposureRow != null) exposureRow.setVisibility(View.GONE);
         if (detailRow != null) detailRow.setVisibility(View.GONE);
-        if (bottomSheetHost != null) bottomSheetHost.setVisibility(View.GONE);
         if (controlsBar != null) controlsBar.setVisibility(View.GONE);
         if (status != null) status.setVisibility(View.GONE);
 
@@ -2786,12 +2671,12 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
         emmcDialog = dialog;
 
-        // Full-screen database: kamera dimatikan dan database memakai seluruh layar.
+        // Bottom sheet: mulai rendah supaya kamera lebih luas.
         final int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        final int minSheet = screenHeight;
-        final int startSheet = screenHeight;
-        final int midSheet = screenHeight;
-        final int maxSheet = screenHeight;
+        final int minSheet = (int)(screenHeight * 0.38f);
+        final int startSheet = (int)(screenHeight * 0.50f);
+        final int midSheet = (int)(screenHeight * 0.62f);
+        final int maxSheet = (int)(screenHeight * 0.78f);
 
         dialog.setOnShowListener(d -> {
             android.view.Window w = dialog.getWindow();
@@ -2802,7 +2687,7 @@ public class MainActivity extends AppCompatActivity {
                 w.setGravity(Gravity.BOTTOM);
                 w.setLayout(-1, startSheet);
 
-                // Full database tidak lagi menjadi bottom sheet.
+                // Drag pada handle: tinggi sheet mengikuti gerakan jari.
                 dragHandle.setOnTouchListener(new View.OnTouchListener() {
                     float downY;
                     int downHeight;
@@ -2855,14 +2740,10 @@ public class MainActivity extends AppCompatActivity {
         });
         dialog.setOnDismissListener(d -> {
             emmcDialog = null;
-            if (cameraBox != null) cameraBox.setVisibility(View.VISIBLE);
             if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
             scheduleLivePanelHide();
             if (status != null) status.setText("LIVE • Kamera siap");
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                startCamera();
-            }
         });
         dialog.show();
         android.view.Window w = dialog.getWindow();
