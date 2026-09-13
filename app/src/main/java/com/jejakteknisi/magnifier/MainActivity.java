@@ -2425,7 +2425,16 @@ public class MainActivity extends AppCompatActivity {
         return b;
     }
 
-    private TextView emmcSectionTitle(String title, int count, boolean green) {
+    private int emmcCategoryColor(String category) {
+        String c = category == null ? "" : category.toUpperCase(Locale.US);
+        if (c.startsWith("A+++") || c.startsWith("A++")) return Color.rgb(255, 225, 35);
+        if (c.startsWith("A+B") || c.equals("A+")) return Color.rgb(70, 225, 125);
+        if (c.startsWith("PILIHAN")) return Color.rgb(70, 225, 125);
+        if (c.contains("SAMSUNG") || c.contains("KHUSUS")) return Color.rgb(225, 115, 225);
+        return Color.rgb(0, 145, 255);
+    }
+
+    private TextView emmcSectionTitle(String title, int count) {
         TextView t = new TextView(this);
         t.setText(title + "   •   " + count + " kode");
         t.setTextColor(Color.BLACK);
@@ -2433,7 +2442,20 @@ public class MainActivity extends AppCompatActivity {
         t.setTypeface(null, Typeface.BOLD);
         t.setGravity(Gravity.CENTER_VERTICAL);
         t.setPadding(dp(14), 0, dp(10), 0);
-        t.setBackground(roundedBg(green ? Color.rgb(70, 225, 125) : Color.rgb(255, 225, 35), Color.TRANSPARENT, 10));
+        t.setBackground(roundedBg(emmcCategoryColor(title), Color.TRANSPARENT, 10));
+        return t;
+    }
+
+    private TextView emmcCategoryCard(String title, int count, String capacity) {
+        TextView t = new TextView(this);
+        String cap = capacity == null || capacity.isEmpty() ? "" : "\nKapasitas: " + capacity;
+        t.setText(title + "\n" + count + " kode" + cap);
+        t.setTextColor(Color.WHITE);
+        t.setTextSize(13);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(14), dp(8), dp(10), dp(8));
+        t.setBackground(roundedBg(Color.rgb(6, 34, 61), emmcCategoryColor(title), 10));
         return t;
     }
 
@@ -2446,30 +2468,35 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Saat Database dibuka, sisakan kamera LIVE di belakang panel.
+        // Database tetap berada di atas kamera LIVE, tetapi status/header kamera disembunyikan
+        // agar tidak bertabrakan dengan status bar HP.
         if (topBar != null) topBar.setVisibility(View.GONE);
         if (infoRow != null) infoRow.setVisibility(View.GONE);
         if (zoomBar != null) zoomBar.setVisibility(View.GONE);
         if (exposureRow != null) exposureRow.setVisibility(View.GONE);
         if (detailRow != null) detailRow.setVisibility(View.GONE);
         if (controlsBar != null) controlsBar.setVisibility(View.GONE);
-        status.setText("LIVE • eMMC DATABASE");
+        if (status != null) status.setVisibility(View.GONE);
 
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(12), dp(10), dp(12), dp(8));
+        panel.setPadding(dp(12), dp(8), dp(12), dp(6));
         panel.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 145, 255), 18));
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(this);
         title.setText("EMMC DATABASE");
-        title.setTextColor(Color.WHITE); title.setTextSize(18); title.setTypeface(null, Typeface.BOLD);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(20);
+        title.setTypeface(null, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(40), 1));
         TextView count = new TextView(this);
         count.setText(all.size() + " kode unik");
-        count.setTextColor(Color.LTGRAY); count.setTextSize(11); count.setGravity(Gravity.CENTER);
-        header.addView(count, new LinearLayout.LayoutParams(dp(85), dp(42)));
+        count.setTextColor(Color.LTGRAY);
+        count.setTextSize(12);
+        count.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
+        header.addView(count, new LinearLayout.LayoutParams(dp(100), dp(40)));
         panel.addView(header);
 
         LinearLayout searchRow = new LinearLayout(this);
@@ -2477,36 +2504,45 @@ public class MainActivity extends AppCompatActivity {
         EditText code = new EditText(this);
         code.setSingleLine(true);
         code.setHint("Cari kode eMMC...");
-        code.setTextColor(Color.WHITE); code.setHintTextColor(Color.rgb(150, 175, 200)); code.setTextSize(15);
+        code.setTextColor(Color.WHITE);
+        code.setHintTextColor(Color.rgb(150, 175, 200));
+        code.setTextSize(15);
         code.setPadding(dp(14), 0, dp(10), 0);
         code.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 145, 255), 24));
-        searchRow.addView(code, new LinearLayout.LayoutParams(0, dp(50), 1));
+        searchRow.addView(code, new LinearLayout.LayoutParams(0, dp(48), 1));
         Button voice = makeButton("🎙");
-        voice.setTextSize(20);
-        searchRow.addView(voice, new LinearLayout.LayoutParams(dp(58), dp(50)));
+        voice.setTextSize(18);
+        voice.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams vp = new LinearLayout.LayoutParams(dp(52), dp(48));
+        vp.leftMargin = dp(6);
+        searchRow.addView(voice, vp);
         panel.addView(searchRow);
 
         HorizontalScrollView filterScroll = new HorizontalScrollView(this);
         filterScroll.setHorizontalScrollBarEnabled(false);
         LinearLayout filters = new LinearLayout(this);
         filters.setGravity(Gravity.CENTER_VERTICAL);
-        filters.setPadding(0, dp(7), 0, dp(7));
+        filters.setPadding(0, dp(5), 0, dp(5));
         String[] filterNames = {"Semua", "A+++", "A++", "A+B", "A+", "Pilihan", "Samsung / A Khusus"};
         ArrayList<Button> filterButtons = new ArrayList<>();
         for (String f : filterNames) {
             Button chip = emmcChip(f, f.equals("Semua"));
             filterButtons.add(chip);
-            filters.addView(chip, new LinearLayout.LayoutParams(-2, dp(38)) {{ leftMargin = dp(4); rightMargin = dp(4); }});
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(36));
+            cp.leftMargin = dp(3); cp.rightMargin = dp(3);
+            filters.addView(chip, cp);
         }
         filterScroll.addView(filters);
         panel.addView(filterScroll);
 
         TextView summary = new TextView(this);
-        summary.setTextColor(Color.LTGRAY); summary.setTextSize(11);
-        summary.setPadding(dp(4), 0, dp(4), dp(5));
+        summary.setTextColor(Color.LTGRAY);
+        summary.setTextSize(11);
+        summary.setPadding(dp(4), 0, dp(4), dp(4));
         panel.addView(summary);
 
         ScrollView resultScroll = new ScrollView(this);
+        resultScroll.setFillViewport(true);
         LinearLayout results = new LinearLayout(this);
         results.setOrientation(LinearLayout.VERTICAL);
         resultScroll.addView(results);
@@ -2514,17 +2550,19 @@ public class MainActivity extends AppCompatActivity {
 
         TextView footer = new TextView(this);
         footer.setText("Keterangan: EMMC/CPU gantian, tergores, sompel, auto retur");
-        footer.setTextColor(Color.rgb(160, 190, 215)); footer.setTextSize(10);
-        footer.setPadding(dp(4), dp(6), dp(4), 0);
+        footer.setTextColor(Color.rgb(160, 190, 215));
+        footer.setTextSize(9);
+        footer.setPadding(dp(4), dp(4), dp(4), 0);
         panel.addView(footer);
 
         final String[] activeFilter = {"Semua"};
 
         Runnable render = () -> {
-            String q = normalizeEmmc(code.getText().toString());
+            String rawQuery = code.getText().toString().trim();
+            String q = normalizeEmmc(rawQuery);
             results.removeAllViews();
+
             java.util.LinkedHashMap<String, ArrayList<EmmcRecord>> grouped = new java.util.LinkedHashMap<>();
-            int matches = 0;
             for (EmmcRecord r : all) {
                 if (!matchesEmmcFilter(r.category, activeFilter[0])) continue;
                 if (!q.isEmpty()) {
@@ -2532,29 +2570,63 @@ public class MainActivity extends AppCompatActivity {
                     if (!hay.contains(q)) continue;
                 }
                 if (!grouped.containsKey(r.category)) grouped.put(r.category, new ArrayList<>());
-                grouped.get(r.category).add(r); matches++;
+                grouped.get(r.category).add(r);
             }
-            summary.setText(matches + " hasil" + (q.isEmpty() ? "" : " untuk \"" + code.getText().toString().trim() + "\""));
+
+            int matches = 0;
+            for (ArrayList<EmmcRecord> list : grouped.values()) matches += list.size();
+            summary.setText(matches + " hasil" + (q.isEmpty() ? "" : " untuk \"" + rawQuery + "\""));
+
             if (matches == 0) {
                 TextView empty = new TextView(this);
-                empty.setText("Kode tidak ditemukan. Coba ketik ulang, gunakan VOICE, atau pilih kategori lain.");
-                empty.setTextColor(Color.LTGRAY); empty.setTextSize(13);
-                empty.setGravity(Gravity.CENTER); empty.setPadding(dp(18), dp(35), dp(18), dp(35));
-                results.addView(empty); return;
+                empty.setText("Kode tidak ditemukan. Coba ketik ulang atau gunakan VOICE.");
+                empty.setTextColor(Color.LTGRAY);
+                empty.setTextSize(13);
+                empty.setGravity(Gravity.CENTER);
+                empty.setPadding(dp(18), dp(35), dp(18), dp(35));
+                results.addView(empty);
+                return;
             }
+
+            // Tanpa pencarian, mode SEMUA hanya menampilkan kategori agar layar tidak penuh 272 kode.
+            boolean categoryOverview = q.isEmpty() && "Semua".equals(activeFilter[0]);
+            if (categoryOverview) {
+                for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
+                    String cat = entry.getKey();
+                    ArrayList<EmmcRecord> rows = entry.getValue();
+                    String capacity = rows.isEmpty() ? "" : rows.get(0).capacity;
+                    TextView card = emmcCategoryCard(cat, rows.size(), capacity);
+                    LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, dp(64));
+                    cp.setMargins(dp(2), dp(3), dp(2), dp(3));
+                    results.addView(card, cp);
+                    card.setOnClickListener(v -> {
+                        activeFilter[0] = cat;
+                        for (int j = 0; j < filterButtons.size(); j++) {
+                            boolean selected = filterNames[j].equals(cat) ||
+                                    ("Pilihan".equals(filterNames[j]) && cat.startsWith("Pilihan")) ||
+                                    ("Samsung / A Khusus".equals(filterNames[j]) && cat.equalsIgnoreCase("A+ Samsung/A Khusus"));
+                            filterButtons.get(j).setBackground(roundedBg(selected ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
+                        }
+                        render.run();
+                    });
+                }
+                return;
+            }
+
             for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
                 String cat = entry.getKey();
                 ArrayList<EmmcRecord> rows = entry.getValue();
-                boolean green = cat.startsWith("Pilihan") || cat.startsWith("A+B");
-                TextView section = emmcSectionTitle(cat, rows.size(), green);
+                TextView section = emmcSectionTitle(cat, rows.size());
                 LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(38));
-                sp.setMargins(dp(2), dp(5), dp(2), dp(3));
+                sp.setMargins(dp(2), dp(4), dp(2), dp(3));
                 results.addView(section, sp);
                 for (EmmcRecord r : rows) {
                     TextView item = new TextView(this);
                     item.setText("▸  " + r.part);
-                    item.setTextColor(Color.WHITE); item.setTextSize(14);
-                    item.setGravity(Gravity.CENTER_VERTICAL); item.setPadding(dp(12), 0, dp(8), 0);
+                    item.setTextColor(Color.WHITE);
+                    item.setTextSize(14);
+                    item.setGravity(Gravity.CENTER_VERTICAL);
+                    item.setPadding(dp(12), 0, dp(8), 0);
                     item.setBackground(roundedBg(Color.rgb(6, 34, 61), Color.rgb(0, 75, 125), 8));
                     item.setOnClickListener(v -> showEmmcDetail(r));
                     LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, dp(40));
@@ -2576,6 +2648,7 @@ public class MainActivity extends AppCompatActivity {
                 render.run();
             });
         }
+
         code.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             public void onTextChanged(CharSequence s, int st, int before, int count2) { render.run(); }
@@ -2592,22 +2665,23 @@ public class MainActivity extends AppCompatActivity {
                 w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 w.setDimAmount(0.0f);
                 w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-                w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.64f));
+                w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.67f));
                 w.setGravity(Gravity.BOTTOM);
             }
         });
         dialog.setOnDismissListener(d -> {
             emmcDialog = null;
+            if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
             scheduleLivePanelHide();
-            status.setText("LIVE • Kamera siap");
+            if (status != null) status.setText("LIVE • Kamera siap");
         });
         dialog.show();
         android.view.Window w = dialog.getWindow();
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             w.setDimAmount(0.0f);
-            w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.64f));
+            w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.67f));
             w.setGravity(Gravity.BOTTOM);
         }
     }

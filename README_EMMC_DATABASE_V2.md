@@ -40,3 +40,13 @@ Aplikasi: V3.4.2
 - Kode dikelompokkan berdasarkan kategori sumber.
 - Ketuk kode untuk melihat detail.
 - Saat ditutup, kontrol microscope dikembalikan.
+
+
+## V3.4.3 UI cleanup
+- EMMC Database panel increased to 67% height.
+- Camera remains visible above the panel.
+- Camera status overlay is hidden while database is open to avoid status-bar overlap.
+- "Semua" shows category overview first instead of listing all codes.
+- Legacy/starter demo records removed from the database.
+- Category cards and filters use compact horizontal scrolling.
+- Search and voice remain available.

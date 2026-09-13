@@ -1,11 +1,4 @@
 part_number,brand,capacity,grade,category,notes
-KLM8G1GETF-B041,Samsung,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-KLMAG1JETD-B041,Samsung,16GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-KLM4G1FETE-B041,Samsung,4GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-THGBMNG5D1LBAIL,Kioxia/Toshiba,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-H26M41203HPR,SK hynix,16GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-SEM08G,Micron,8GB,A+++,Legacy / starter,Starter database - tambah data teknisi
-EMMC-V1-DEMO,Jejak Teknisi,Contoh,A+++,Legacy / starter,Template untuk pengisian database
 H9HQ22AECMMD,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
 KM2B8001CM,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
 KM8F8001JM,Tidak dicantumkan,256GB,A+++,A+++ 256,Sumber: file EMMC_database_teks_biasa
