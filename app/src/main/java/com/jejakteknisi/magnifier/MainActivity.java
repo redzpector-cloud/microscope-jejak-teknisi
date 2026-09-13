@@ -2557,7 +2557,8 @@ public class MainActivity extends AppCompatActivity {
 
         final String[] activeFilter = {"Semua"};
 
-        Runnable render = () -> {
+        final Runnable[] renderer = new Runnable[1];
+        renderer[0] = () -> {
             String rawQuery = code.getText().toString().trim();
             String q = normalizeEmmc(rawQuery);
             results.removeAllViews();
@@ -2607,7 +2608,7 @@ public class MainActivity extends AppCompatActivity {
                                     ("Samsung / A Khusus".equals(filterNames[j]) && cat.equalsIgnoreCase("A+ Samsung/A Khusus"));
                             filterButtons.get(j).setBackground(roundedBg(selected ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
                         }
-                        render.run();
+                        renderer[0].run();
                     });
                 }
                 return;
@@ -2645,17 +2646,17 @@ public class MainActivity extends AppCompatActivity {
                     boolean sel = j == index;
                     b.setBackground(roundedBg(sel ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
                 }
-                render.run();
+                renderer[0].run();
             });
         }
 
         code.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            public void onTextChanged(CharSequence s, int st, int before, int count2) { render.run(); }
+            public void onTextChanged(CharSequence s, int st, int before, int count2) { renderer[0].run(); }
             public void afterTextChanged(android.text.Editable e) {}
         });
         voice.setOnClickListener(v -> startEmmcVoice(code));
-        render.run();
+        renderer[0].run();
 
         AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
         emmcDialog = dialog;
