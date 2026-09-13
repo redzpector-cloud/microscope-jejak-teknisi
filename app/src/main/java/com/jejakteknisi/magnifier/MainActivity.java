@@ -2073,7 +2073,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
         camera = null;
-        if (preview != null) preview.setVisibility(View.INVISIBLE);
+        if (preview != null) preview.setVisibility(View.VISIBLE);
     }
 
     private void startCamera() {
@@ -2648,17 +2648,10 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout filters = new LinearLayout(this);
         filters.setGravity(Gravity.CENTER_VERTICAL);
         filters.setPadding(0, dp(5), 0, dp(5));
-        String[] filterNames = {"Semua", "A+++", "A++", "A+B", "A+", "Pilihan", "Samsung / A Khusus"};
-        ArrayList<Button> filterButtons = new ArrayList<>();
-        for (String f : filterNames) {
-            Button chip = emmcChip(f, f.equals("Semua"));
-            filterButtons.add(chip);
-            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-2, dp(36));
-            cp.leftMargin = dp(3); cp.rightMargin = dp(3);
-            filters.addView(chip, cp);
-        }
-        filterScroll.addView(filters);
-        panel.addView(filterScroll);
+        // Filter kategori dihapus sesuai desain database baru: fokus ke pencarian kode.
+        // Seluruh data tetap tampil dan bisa dicari langsung melalui kolom pencarian.
+        // Tidak ada chip Semua/A+++/A+/Pilihan/Samsung di layar.
+        filterScroll.setVisibility(View.GONE);
 
         TextView summary = new TextView(this);
         summary.setTextColor(Color.LTGRAY);
@@ -2855,7 +2848,14 @@ public class MainActivity extends AppCompatActivity {
         });
         dialog.setOnDismissListener(d -> {
             emmcDialog = null;
+            if (topBar != null) topBar.setVisibility(View.VISIBLE);
             if (cameraBox != null) cameraBox.setVisibility(View.VISIBLE);
+            if (infoRow != null) infoRow.setVisibility(View.VISIBLE);
+            if (zoomBar != null) zoomBar.setVisibility(View.VISIBLE);
+            if (exposureRow != null) exposureRow.setVisibility(View.VISIBLE);
+            if (detailRow != null) detailRow.setVisibility(View.VISIBLE);
+            if (bottomSheetHost != null) bottomSheetHost.setVisibility(View.VISIBLE);
+            if (controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
             if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
             scheduleLivePanelHide();
@@ -2959,17 +2959,41 @@ public class MainActivity extends AppCompatActivity {
         }
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         speechRecognizer.setRecognitionListener(new android.speech.RecognitionListener() {
-            @Override public void onReadyForSpeech(Bundle params) { status.setText("VOICE eMMC • sebutkan kode..."); }
+            @Override public void onReadyForSpeech(Bundle params) {
+                Toast.makeText(MainActivity.this, "VOICE aktif — sebutkan kode eMMC", Toast.LENGTH_SHORT).show();
+            }
             @Override public void onBeginningOfSpeech() {}
             @Override public void onRmsChanged(float rmsdB) {}
             @Override public void onBufferReceived(byte[] buffer) {}
-            @Override public void onEndOfSpeech() { status.setText("VOICE eMMC • memproses..."); }
-            @Override public void onError(int error) { status.setText("VOICE eMMC • tidak terbaca"); }
+            @Override public void onEndOfSpeech() {
+                Toast.makeText(MainActivity.this, "Memproses suara...", Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onError(int error) {
+                String msg;
+                switch (error) {
+                    case SpeechRecognizer.ERROR_AUDIO: msg = "Audio tidak bisa dibaca"; break;
+                    case SpeechRecognizer.ERROR_CLIENT: msg = "Voice gagal dijalankan"; break;
+                    case SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS: msg = "Izin mikrofon belum diberikan"; break;
+                    case SpeechRecognizer.ERROR_NETWORK:
+                    case SpeechRecognizer.ERROR_NETWORK_TIMEOUT: msg = "Koneksi voice bermasalah"; break;
+                    case SpeechRecognizer.ERROR_NO_MATCH: msg = "Kode tidak terdengar jelas"; break;
+                    case SpeechRecognizer.ERROR_RECOGNIZER_BUSY: msg = "Voice sedang sibuk"; break;
+                    default: msg = "Voice tidak terbaca"; break;
+                }
+                Toast.makeText(MainActivity.this, msg + " — coba lagi", Toast.LENGTH_SHORT).show();
+            }
             @Override public void onResults(Bundle results) {
                 ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
                 if (list != null && !list.isEmpty()) {
-                    target.setText(list.get(0).toUpperCase(Locale.US).replaceAll("\\s+", ""));
-                    status.setText("VOICE eMMC • kode diterima");
+                    String spoken = list.get(0).toUpperCase(Locale.US);
+                    // Normalisasi suara untuk kode eMMC: hilangkan spasi/tanda baca.
+                    spoken = spoken.replaceAll("[^A-Z0-9]", "");
+                    target.setText(spoken);
+                    target.setSelection(target.length());
+                    Toast.makeText(MainActivity.this, "VOICE: " + spoken, Toast.LENGTH_SHORT).show();
+                    // Jalankan pencarian otomatis setelah suara diterima.
+                    target.clearFocus();
+                    target.postDelayed(() -> target.getRootView().findFocus(), 50);
                 }
             }
             @Override public void onPartialResults(Bundle partialResults) {}
@@ -2978,8 +3002,15 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sebutkan kode eMMC");
-        speechRecognizer.startListening(intent);
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
+        intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sebutkan kode eMMC, contoh H9TQ17 atau KM8F9001");
+        try {
+            speechRecognizer.startListening(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, "Voice tidak bisa dimulai: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     private void scanEmmcOcr(EditText target, TextView result) {
