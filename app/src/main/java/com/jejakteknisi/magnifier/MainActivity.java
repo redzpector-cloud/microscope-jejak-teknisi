@@ -2924,16 +2924,19 @@ public class MainActivity extends AppCompatActivity {
         if (speechRecognizer != null) {
             try { speechRecognizer.destroy(); } catch (Exception ignored) {}
         }
+
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
         speechRecognizer.setRecognitionListener(new android.speech.RecognitionListener() {
             @Override public void onReadyForSpeech(Bundle params) {
-                Toast.makeText(MainActivity.this, "VOICE aktif — sebutkan kode eMMC", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this,
+                        "🎙️ Sebutkan kode per bagian, contoh: K M Q X 8 0 0 0 S A",
+                        Toast.LENGTH_SHORT).show();
             }
             @Override public void onBeginningOfSpeech() {}
             @Override public void onRmsChanged(float rmsdB) {}
             @Override public void onBufferReceived(byte[] buffer) {}
             @Override public void onEndOfSpeech() {
-                Toast.makeText(MainActivity.this, "Memproses suara...", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "Memproses kode...", Toast.LENGTH_SHORT).show();
             }
             @Override public void onError(int error) {
                 String msg;
@@ -2947,35 +2950,39 @@ public class MainActivity extends AppCompatActivity {
                     case SpeechRecognizer.ERROR_RECOGNIZER_BUSY: msg = "Voice sedang sibuk"; break;
                     default: msg = "Voice tidak terbaca"; break;
                 }
-                Toast.makeText(MainActivity.this, msg + " — coba lagi", Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, msg + " — ulangi perlahan", Toast.LENGTH_SHORT).show();
             }
             @Override public void onResults(Bundle results) {
                 ArrayList<String> list = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
-                if (list != null && !list.isEmpty()) {
-                    String bestSpoken = list.get(0);
-                    String spoken = normalizeSpokenEmmc(bestSpoken);
-                    // Coba semua hasil recognition dan pilih yang paling dekat dengan
-                    // part number database. Ini jauh lebih cocok untuk kode seperti KMQX8000SA.
-                    String corrected = bestDatabaseVoiceMatch(list);
-                    if (corrected != null && !corrected.isEmpty()) spoken = corrected;
-                    target.setText(spoken);
+                String corrected = bestDatabaseVoiceMatch(list);
+                if (corrected == null || corrected.isEmpty()) {
+                    String raw = (list != null && !list.isEmpty()) ? list.get(0) : "";
+                    corrected = normalizeSpokenEmmc(raw);
+                }
+
+                if (corrected != null && corrected.length() >= 3) {
+                    target.setText(corrected);
                     target.setSelection(target.length());
-                    Toast.makeText(MainActivity.this, "VOICE: " + spoken, Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "VOICE → " + corrected, Toast.LENGTH_SHORT).show();
                     target.clearFocus();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "Kode belum terbaca. Coba sebut huruf satu-satu.", Toast.LENGTH_SHORT).show();
                 }
             }
             @Override public void onPartialResults(Bundle partialResults) {}
             @Override public void onEvent(int eventType, Bundle params) {}
         });
+
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        // English lebih konsisten untuk kombinasi huruf/angka kode eMMC.
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-US");
-        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
+        // Bahasa Indonesia lebih nyaman untuk teknisi lokal; normalizer di bawah
+        // khusus menangani nama huruf/angka yang keluar dari hasil voice.
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "id-ID");
+        intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 10);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
-        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sebutkan kode eMMC, contoh H9TQ17 atau KM8F9001");
+        intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Sebutkan kode eMMC: K M Q X 8 0 0 0 S A");
         try {
             speechRecognizer.startListening(intent);
         } catch (Exception e) {
@@ -2986,125 +2993,200 @@ public class MainActivity extends AppCompatActivity {
     private String normalizeSpokenEmmc(String text) {
         if (text == null) return "";
         String s = text.toUpperCase(Locale.US).trim();
+        s = s.replace('-', ' ').replace('_', ' ').replace('.', ' ');
         s = s.replaceAll("[^A-Z0-9 ]", " ").replaceAll("\\s+", " ").trim();
         if (s.isEmpty()) return "";
 
-        // Bentuk angka yang sering keluar dari voice recognition.
-        String[] phrases = {
-                "DOUBLE ZERO", "TRIPLE ZERO", "DOUBLE O", "TRIPLE O",
-                "ONE THOUSAND", "TWO THOUSAND", "THREE THOUSAND", "FOUR THOUSAND",
-                "FIVE THOUSAND", "SIX THOUSAND", "SEVEN THOUSAND", "EIGHT THOUSAND", "NINE THOUSAND",
-                "TEN THOUSAND"
+        // Frasa angka panjang harus diproses lebih dulu.
+        String[][] phrases = {
+                {"DOUBLE ZERO","00"}, {"TRIPLE ZERO","000"},
+                {"DOUBLE O","00"}, {"TRIPLE O","000"},
+                {"DELAPAN RIBU","8000"}, {"SEMBILAN RIBU","9000"},
+                {"TUJUH RIBU","7000"}, {"ENAM RIBU","6000"},
+                {"LIMA RIBU","5000"}, {"EMPAT RIBU","4000"},
+                {"TIGA RIBU","3000"}, {"DUA RIBU","2000"},
+                {"SERIBU","1000"}, {"ONE THOUSAND","1000"},
+                {"TWO THOUSAND","2000"}, {"THREE THOUSAND","3000"},
+                {"FOUR THOUSAND","4000"}, {"FIVE THOUSAND","5000"},
+                {"SIX THOUSAND","6000"}, {"SEVEN THOUSAND","7000"},
+                {"EIGHT THOUSAND","8000"}, {"NINE THOUSAND","9000"}
         };
-        String[] values = {"00", "000", "00", "000", "1000", "2000", "3000", "4000", "5000", "6000", "7000", "8000", "9000", "10000"};
-        for (int i = 0; i < phrases.length; i++) s = s.replace(phrases[i], values[i]);
+        for (String[] p : phrases) s = s.replace(p[0], p[1]);
 
-        // Huruf alfabet yang umum dibaca oleh recognizer sebagai kata.
-        String[] letters = {
-                "AY", "BEE", "SEE", "SEA", "DEE", "EE", "EF", "JAY", "KAY", "EL", "EM", "EN",
-                "PEE", "CUE", "ARE", "ESS", "TEE", "YOU", "VEE", "DOUBLE YOU", "EX", "WHY", "ZEE", "ZED"
+        // Nama huruf yang umum terdengar dari voice Indonesia/Inggris.
+        String[][] letters = {
+                {"AY","A"},{"EY","A"},{"A","A"},
+                {"BEE","B"},{"BI","B"},{"BE","B"},
+                {"SEE","C"},{"SEA","C"},{"SI","C"},{"CE","C"},
+                {"DEE","D"},{"DI","D"},{"DE","D"},
+                {"EE","E"},{"I","E"},
+                {"EF","F"},{"E F","F"},
+                {"JAY","J"},{"JEI","J"},{"JE","J"},
+                {"KAY","K"},{"KEI","K"},{"KA","K"},
+                {"EL","L"},{"ELL","L"},{"ELLE","L"},
+                {"EM","M"},{"EMM","M"},{"ME","M"},
+                {"EN","N"},{"ENN","N"},
+                {"PEE","P"},{"PI","P"},
+                {"CUE","Q"},{"KIU","Q"},{"KYU","Q"},
+                {"ARE","R"},{"AR","R"},
+                {"ESS","S"},{"ES","S"},
+                {"TEE","T"},{"TI","T"},
+                {"YOU","U"},{"YU","U"},
+                {"VEE","V"},{"VI","V"},
+                {"DOUBLE YOU","W"},{"DABLU YOU","W"},
+                {"EX","X"},{"EKS","X"},
+                {"WHY","Y"},{"WAI","Y"},
+                {"ZEE","Z"},{"ZED","Z"}
         };
-        String[] letterValues = {
-                "A", "B", "C", "C", "D", "E", "F", "J", "K", "L", "M", "N",
-                "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "Z"
-        };
-        for (int i = 0; i < letters.length; i++) s = s.replaceAll("\\b" + letters[i] + "\\b", letterValues[i]);
+        // Frasa multi-kata sebelum token tunggal.
+        s = s.replace("DOUBLE YOU", "W").replace("DABLU YOU", "W");
+        for (String[] p : letters) {
+            s = s.replaceAll("\\b" + java.util.regex.Pattern.quote(p[0]) + "\\b", p[1]);
+        }
 
-        // Bahasa Indonesia dan Inggris untuk angka tunggal.
-        String[] words = {"ZERO","OH","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
-                "SATU","DUA","TIGA","EMPAT","LIMA","ENAM","TUJUH","DELAPAN","SEMBILAN"};
+        String[] words = {
+                "ZERO","OH","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
+                "NOL","SATU","DUA","TIGA","EMPAT","LIMA","ENAM","TUJUH","DELAPAN","SEMBILAN"
+        };
         String[] nums = {"0","0","1","2","3","4","5","6","7","8","9",
-                "1","2","3","4","5","6","7","8","9"};
-        for (int i = 0; i < words.length; i++) s = s.replaceAll("\\b" + words[i] + "\\b", nums[i]);
+                "0","1","2","3","4","5","6","7","8","9"};
+        for (int i = 0; i < words.length; i++) {
+            s = s.replaceAll("\\b" + java.util.regex.Pattern.quote(words[i]) + "\\b", nums[i]);
+        }
 
-        // Angka belasan yang kadang muncul saat teknisi menyebut kapasitas/kode.
-        String[] teens = {"TEN","ELEVEN","TWELVE","THIRTEEN","FOURTEEN","FIFTEEN","SIXTEEN","SEVENTEEN","EIGHTEEN","NINETEEN"};
-        for (int i = 0; i < teens.length; i++) s = s.replaceAll("\\b" + teens[i] + "\\b", String.valueOf(10 + i));
+        // Belasan.
+        String[][] teens = {
+                {"TEN","10"},{"ELEVEN","11"},{"TWELVE","12"},{"THIRTEEN","13"},
+                {"FOURTEEN","14"},{"FIFTEEN","15"},{"SIXTEEN","16"},
+                {"SEVENTEEN","17"},{"EIGHTEEN","18"},{"NINETEEN","19"}
+        };
+        for (String[] p : teens) s = s.replaceAll("\\b" + p[0] + "\\b", p[1]);
 
+        // Hapus kata instruksi yang tidak termasuk part number.
+        s = s.replaceAll("\\b(KODE|EMMC|CARI|TOLONG|CARIIN|PLEASE|SEARCH|LOOK|FOR)\\b", " ");
         return s.replaceAll("[^A-Z0-9]", "");
     }
 
     private String bestDatabaseVoiceMatch(ArrayList<String> recognitionResults) {
+        if (recognitionResults == null || recognitionResults.isEmpty()) return null;
         ArrayList<EmmcRecord> all = loadEmmcDatabase();
         if (all.isEmpty()) return null;
+
         String bestPart = null;
-        int bestDistance = Integer.MAX_VALUE;
+        int bestScore = Integer.MAX_VALUE;
+
         for (String raw : recognitionResults) {
             String q = normalizeSpokenEmmc(raw);
-            if (q.length() < 4) continue;
+            if (q.length() < 3) continue;
+
             for (EmmcRecord r : all) {
                 String part = normalizeEmmc(r.part);
                 if (part.isEmpty()) continue;
-                if (q.equals(part) || q.contains(part) || part.contains(q)) return r.part;
+
+                if (q.equals(part)) return r.part;
+                if (q.contains(part) || part.contains(q)) {
+                    int score = Math.abs(part.length() - q.length());
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestPart = r.part;
+                    }
+                    continue;
+                }
+
+                // Toleransi lebih besar untuk kode panjang karena voice sering salah
+                // satu atau dua karakter, tetapi jangan menerima hasil yang terlalu jauh.
                 int d = levenshtein(q, part);
-                int threshold = part.length() >= 10 ? 2 : 1;
-                if (d <= threshold && d < bestDistance) {
-                    bestDistance = d;
-                    bestPart = r.part;
+                int maxErrors = part.length() >= 9 ? 3 : (part.length() >= 6 ? 2 : 1);
+                if (d <= maxErrors) {
+                    int score = d * 10 + Math.abs(part.length() - q.length());
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestPart = r.part;
+                    }
                 }
             }
         }
         return bestPart;
     }
 
-    private int levenshtein(String a, String b) {
-        int[] prev = new int[b.length() + 1];
-        int[] cur = new int[b.length() + 1];
-        for (int j = 0; j <= b.length(); j++) prev[j] = j;
-        for (int i = 1; i <= a.length(); i++) {
-            cur[0] = i;
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
-            }
-            int[] tmp = prev; prev = cur; cur = tmp;
-        }
-        return prev[b.length()];
-    }
-
     private void showGradeMemorization() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16), dp(12), dp(16), dp(10));
-        root.setBackgroundColor(Color.rgb(3, 20, 38));
+        root.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 145, 255), 16));
 
         TextView title = new TextView(this);
-        title.setText("📚 CARA CEPAT HAPAL GRADE");
+        title.setText("📚  CARA CEPAT HAPAL GRADE");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(20);
+        title.setTextSize(18);
         title.setTypeface(null, Typeface.BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(42)));
+        title.setSingleLine(true);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(36)));
 
         TextView sub = new TextView(this);
-        sub.setText("Pilih brand untuk melihat rumus, lalu latihan sampai hafal.");
-        sub.setTextColor(Color.LTGRAY);
+        sub.setText("Rumus singkat + latihan agar cepat hafal kode eMMC.");
+        sub.setTextColor(Color.rgb(175, 205, 230));
         sub.setTextSize(12);
         sub.setPadding(0, 0, 0, dp(8));
-        root.addView(sub);
+        root.addView(sub, new LinearLayout.LayoutParams(-1, dp(32)));
 
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
         LinearLayout brandBox = new LinearLayout(this);
         brandBox.setOrientation(LinearLayout.VERTICAL);
-        addGradeBrandButton(brandBox, "SAMSUNG", "A = 16GB • B = 32GB • C = 64GB • D = 128GB • E = 256GB • F = 512GB", 0, "SAMSUNG");
-        addGradeBrandButton(brandBox, "TOSHIBA", "7 = 16GB • 8 = 32GB • 9 = 64GB", 1, "TOSHIBA");
-        addGradeBrandButton(brandBox, "ASUS", "H26M 4/5/6/7 • H28U 6/7/8 • YMEC/YMUS", 2, "ASUS");
-        addGradeBrandButton(brandBox, "SK HYNIX", "32/64_65/17_18/26_27/52_53/15_16/21_22", 3, "SK HYNIX");
-        root.addView(brandBox, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        addGradeBrandButton(brandBox, "SAMSUNG",
+                "A 16GB  •  B 32GB  •  C 64GB  •  D 128GB  •  E 256GB  •  F 512GB",
+                0, "SAMSUNG");
+        addGradeBrandButton(brandBox, "TOSHIBA",
+                "7 16GB  •  8 32GB  •  9 64GB",
+                1, "TOSHIBA");
+        addGradeBrandButton(brandBox, "ASUS",
+                "H26M 4/5/6/7  •  H28U 6/7/8  •  YMEC/YMUS",
+                2, "ASUS");
+        addGradeBrandButton(brandBox, "SK HYNIX",
+                "32  •  64_65  •  17_18  •  26_27  •  52_53  •  15_16  •  21_22",
+                3, "SK HYNIX");
+
+        scroll.addView(brandBox);
+        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         Button quiz = makeButton("🎯  TEBAK GRADE");
-        quiz.setTextSize(14);
-        root.addView(quiz, new LinearLayout.LayoutParams(-1, dp(50)));
+        quiz.setTextSize(13);
+        quiz.setTypeface(null, Typeface.BOLD);
+        LinearLayout.LayoutParams qp = new LinearLayout.LayoutParams(-1, dp(46));
+        qp.topMargin = dp(8);
+        root.addView(quiz, qp);
         quiz.setOnClickListener(v -> showGradeQuiz());
 
-        new AlertDialog.Builder(this).setView(root).setPositiveButton("Tutup", null).show();
+        final AlertDialog dialog = new AlertDialog.Builder(this).setView(root).create();
+        dialog.setOnShowListener(d -> {
+            android.view.Window w = dialog.getWindow();
+            if (w != null) {
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                w.setLayout((int)(getResources().getDisplayMetrics().widthPixels * 0.90),
+                        (int)(getResources().getDisplayMetrics().heightPixels * 0.82));
+            }
+        });
+        dialog.show();
+        // setLayout juga setelah show agar ukuran dialog mengikuti layar pada semua perangkat.
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(
+                    (int)(getResources().getDisplayMetrics().widthPixels * 0.90),
+                    (int)(getResources().getDisplayMetrics().heightPixels * 0.82));
+        }
     }
 
     private void addGradeBrandButton(LinearLayout parent, String name, String desc, int index, String key) {
-        Button b = makeButton(name + "\n" + desc);
-        b.setTextSize(11);
+        Button b = makeButton(name + "   •   " + desc);
+        b.setTextSize(10);
         b.setGravity(Gravity.CENTER_VERTICAL | Gravity.LEFT);
+        b.setSingleLine(false);
         b.setPadding(dp(14), dp(4), dp(10), dp(4));
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(62));
-        lp.setMargins(0, dp(4), 0, dp(4));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(54));
+        lp.setMargins(0, dp(3), 0, dp(3));
         parent.addView(b, lp);
         b.setOnClickListener(v -> showGradeReference(key));
     }
