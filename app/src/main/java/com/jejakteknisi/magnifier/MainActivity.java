@@ -2643,16 +2643,6 @@ public class MainActivity extends AppCompatActivity {
         searchRow.addView(voice, vp);
         panel.addView(searchRow);
 
-        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
-        filterScroll.setHorizontalScrollBarEnabled(false);
-        LinearLayout filters = new LinearLayout(this);
-        filters.setGravity(Gravity.CENTER_VERTICAL);
-        filters.setPadding(0, dp(5), 0, dp(5));
-        // Filter kategori dihapus sesuai desain database baru: fokus ke pencarian kode.
-        // Seluruh data tetap tampil dan bisa dicari langsung melalui kolom pencarian.
-        // Tidak ada chip Semua/A+++/A+/Pilihan/Samsung di layar.
-        filterScroll.setVisibility(View.GONE);
-
         TextView summary = new TextView(this);
         summary.setTextColor(Color.LTGRAY);
         summary.setTextSize(11);
@@ -2673,8 +2663,6 @@ public class MainActivity extends AppCompatActivity {
         footer.setPadding(dp(4), dp(4), dp(4), 0);
         panel.addView(footer);
 
-        final String[] activeFilter = {"Semua"};
-
         final Runnable[] renderer = new Runnable[1];
         renderer[0] = () -> {
             String rawQuery = code.getText().toString().trim();
@@ -2683,7 +2671,6 @@ public class MainActivity extends AppCompatActivity {
 
             java.util.LinkedHashMap<String, ArrayList<EmmcRecord>> grouped = new java.util.LinkedHashMap<>();
             for (EmmcRecord r : all) {
-                if (!matchesEmmcFilter(r.category, activeFilter[0])) continue;
                 if (!q.isEmpty()) {
                     String hay = normalizeEmmc(r.part + r.category + r.brand + r.capacity);
                     if (!hay.contains(q)) continue;
@@ -2707,30 +2694,8 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
 
-            // Tanpa pencarian, mode SEMUA hanya menampilkan kategori agar layar tidak penuh 272 kode.
-            boolean categoryOverview = q.isEmpty() && "Semua".equals(activeFilter[0]);
-            if (categoryOverview) {
-                for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
-                    String cat = entry.getKey();
-                    ArrayList<EmmcRecord> rows = entry.getValue();
-                    String capacity = rows.isEmpty() ? "" : rows.get(0).capacity;
-                    TextView card = emmcCategoryCard(cat, rows.size(), capacity);
-                    LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(-1, dp(64));
-                    cp.setMargins(dp(2), dp(3), dp(2), dp(3));
-                    results.addView(card, cp);
-                    card.setOnClickListener(v -> {
-                        activeFilter[0] = cat;
-                        for (int j = 0; j < filterButtons.size(); j++) {
-                            boolean selected = filterNames[j].equals(cat) ||
-                                    ("Pilihan".equals(filterNames[j]) && cat.startsWith("Pilihan")) ||
-                                    ("Samsung / A Khusus".equals(filterNames[j]) && cat.equalsIgnoreCase("A+ Samsung/A Khusus"));
-                            filterButtons.get(j).setBackground(roundedBg(selected ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
-                        }
-                        renderer[0].run();
-                    });
-                }
-                return;
-            }
+            // Tanpa chip/filter: tampilkan seluruh database dan kelompokkan berdasarkan kategori.
+            // Kategori tetap ditampilkan sebagai judul bagian, bukan sebagai tombol filter.
 
             for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
                 String cat = entry.getKey();
@@ -2755,18 +2720,6 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
-        for (int i = 0; i < filterButtons.size(); i++) {
-            final int index = i;
-            filterButtons.get(i).setOnClickListener(v -> {
-                activeFilter[0] = filterNames[index];
-                for (int j = 0; j < filterButtons.size(); j++) {
-                    Button b = filterButtons.get(j);
-                    boolean sel = j == index;
-                    b.setBackground(roundedBg(sel ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
-                }
-                renderer[0].run();
-            });
-        }
 
         code.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
@@ -2859,9 +2812,15 @@ public class MainActivity extends AppCompatActivity {
             if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
             scheduleLivePanelHide();
-            if (status != null) status.setText("LIVE • Kamera siap");
+            if (status != null) status.setText("Menyiapkan kamera LIVE...");
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                startCamera();
+                // Beri waktu Window/Dialog menutup sebelum CameraX memasang Preview kembali.
+                preview.postDelayed(() -> {
+                    if (!isFinishing() && !frozen) {
+                        preview.setVisibility(View.VISIBLE);
+                        startCamera();
+                    }
+                }, 180);
             }
         });
         dialog.show();
@@ -2987,7 +2946,7 @@ public class MainActivity extends AppCompatActivity {
                 if (list != null && !list.isEmpty()) {
                     String spoken = list.get(0).toUpperCase(Locale.US);
                     // Normalisasi suara untuk kode eMMC: hilangkan spasi/tanda baca.
-                    spoken = spoken.replaceAll("[^A-Z0-9]", "");
+                    spoken = normalizeSpokenEmmc(spoken);
                     target.setText(spoken);
                     target.setSelection(target.length());
                     Toast.makeText(MainActivity.this, "VOICE: " + spoken, Toast.LENGTH_SHORT).show();
@@ -3001,7 +2960,9 @@ public class MainActivity extends AppCompatActivity {
         });
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        // English lebih konsisten untuk kombinasi huruf/angka kode eMMC.
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US");
+        intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "en-US");
         intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5);
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false);
@@ -3011,6 +2972,47 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Toast.makeText(this, "Voice tidak bisa dimulai: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private String normalizeSpokenEmmc(String text) {
+        if (text == null) return "";
+        String s = text.toUpperCase(Locale.US).trim();
+        // Speech recognizer sering mengubah angka/huruf kode menjadi kata.
+        String[] words = {
+                "ZERO","OH","ONE","TWO","THREE","FOUR","FIVE","SIX","SEVEN","EIGHT","NINE",
+                "ZERO","SATU","DUA","TIGA","EMPAT","LIMA","ENAM","TUJUH","DELAPAN","SEMBILAN"
+        };
+        String[] nums = {
+                "0","0","1","2","3","4","5","6","7","8","9",
+                "0","1","2","3","4","5","6","7","8","9"
+        };
+        for (int i = 0; i < words.length; i++) {
+            s = s.replaceAll("\\b" + words[i] + "\\b", nums[i]);
+        }
+        // Common recognizer substitutions for letter names.
+        s = s.replaceAll("\\b(AY|EYE)\\b", "I");
+        s = s.replaceAll("\\b(BEE)\\b", "B");
+        s = s.replaceAll("\\b(SEE|SEA)\\b", "C");
+        s = s.replaceAll("\\b(DEE)\\b", "D");
+        s = s.replaceAll("\\b(E)\\b", "E");
+        s = s.replaceAll("\\b(EF)\\b", "F");
+        s = s.replaceAll("\\b(JAY)\\b", "J");
+        s = s.replaceAll("\\b(KAY)\\b", "K");
+        s = s.replaceAll("\\b(EL)\\b", "L");
+        s = s.replaceAll("\\b(EM)\\b", "M");
+        s = s.replaceAll("\\b(EN)\\b", "N");
+        s = s.replaceAll("\\b(PEE)\\b", "P");
+        s = s.replaceAll("\\b(CUE|Q)\\b", "Q");
+        s = s.replaceAll("\\b(ARE)\\b", "R");
+        s = s.replaceAll("\\b(ESS)\\b", "S");
+        s = s.replaceAll("\\b(TEE)\\b", "T");
+        s = s.replaceAll("\\b(U)\\b", "U");
+        s = s.replaceAll("\\b(VEE)\\b", "V");
+        s = s.replaceAll("\\b(DOUBLE YOU)\\b", "W");
+        s = s.replaceAll("\\b(EX)\\b", "X");
+        s = s.replaceAll("\\b(WHY)\\b", "Y");
+        s = s.replaceAll("\\b(ZEE|ZED)\\b", "Z");
+        return s.replaceAll("[^A-Z0-9]", "");
     }
 
     private void scanEmmcOcr(EditText target, TextView result) {
