@@ -193,6 +193,10 @@ public class MainActivity extends AppCompatActivity {
         buildUi();
         applySystemBarInsets();
 
+        if (getIntent().getBooleanExtra("open_emmc", false)) {
+            new Handler(Looper.getMainLooper()).postDelayed(() -> showEmmcDatabase(), 250);
+        }
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(
