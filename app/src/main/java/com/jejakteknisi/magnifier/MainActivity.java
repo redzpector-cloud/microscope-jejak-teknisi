@@ -125,6 +125,8 @@ public class MainActivity extends AppCompatActivity {
     private Button overlayBtn;
     private boolean torch = false;
     private int navigationBarBottomInset = 0;
+    private int exposureLower = -4;
+    private int exposureUpper = 4;
     // LIVE camera control panel auto-hide
     private final Handler livePanelHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideLivePanelRunnable = () -> setLivePanelVisible(false);
@@ -136,10 +138,10 @@ public class MainActivity extends AppCompatActivity {
     private float bottomSheetDownY;
     private int bottomSheetStartHeight;
     private boolean bottomSheetMoved = false;
-    private static final int BOTTOM_SHEET_MIN_DP = 88;
-    private static final int BOTTOM_SHEET_START_DP = 96;
-    private static final int BOTTOM_SHEET_MID_DP = 122;
-    private static final int BOTTOM_SHEET_MAX_DP = 150;
+    private static final int BOTTOM_SHEET_MIN_DP = 72;
+    private static final int BOTTOM_SHEET_START_DP = 80;
+    private static final int BOTTOM_SHEET_MID_DP = 108;
+    private static final int BOTTOM_SHEET_MAX_DP = 142;
 
     // V3.0 Crosshair + Grid overlay
     private OverlayView overlayView;
@@ -324,11 +326,11 @@ public class MainActivity extends AppCompatActivity {
         detailRow.setOrientation(LinearLayout.HORIZONTAL);
         detailRow.setGravity(Gravity.CENTER_VERTICAL);
         detailRow.setPadding(dp(8), 0, dp(8), 0);
-        detailText = makeInfoText("Ultra Detail 80%");
+        detailText = makeInfoText(detailOn ? "Ultra Detail 65%" : "Detail normal 35%");
         detailRow.addView(detailText, new LinearLayout.LayoutParams(dp(88), dp(38)));
         detailBar = new SeekBar(this);
         detailBar.setMax(100);
-        detailBar.setProgress(80);
+        detailBar.setProgress(detailOn ? 65 : 35);
         detailRow.addView(detailBar, new LinearLayout.LayoutParams(0, dp(38), 1));
         root.addView(detailRow, new LinearLayout.LayoutParams(-1, dp(40)));
 
@@ -351,13 +353,13 @@ public class MainActivity extends AppCompatActivity {
         Button plus = makeButton("+");
         cameraPlusBtn = plus;
 
-        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(62), .55f));
-        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
-        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
-        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(70), 1.25f));
-        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
-        controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(62), 1.0f));
-        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(62), .55f));
+        controls.addView(minus, new LinearLayout.LayoutParams(0, dp(56), .55f));
+        controls.addView(torchBtn, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
+        controls.addView(freezeBtn, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
+        controls.addView(photoBtn, new LinearLayout.LayoutParams(0, dp(62), 1.25f));
+        controls.addView(focus, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
+        controls.addView(overlayBtn, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
+        controls.addView(plus, new LinearLayout.LayoutParams(0, dp(56), .55f));
 
         // Bottom sheet host: tinggi berubah mengikuti drag sehingga preview kamera
         // ikut membesar/mengecil. Ada 3 posisi snap: rendah, tengah, tinggi.
@@ -372,11 +374,11 @@ public class MainActivity extends AppCompatActivity {
         bottomSheetHandle.setGravity(Gravity.CENTER);
         bottomSheetHost.addView(
                 bottomSheetHandle,
-                new FrameLayout.LayoutParams(-1, dp(18), Gravity.TOP)
+                new FrameLayout.LayoutParams(-1, dp(24), Gravity.TOP)
         );
 
         FrameLayout.LayoutParams controlsParams =
-                new FrameLayout.LayoutParams(-1, dp(78), Gravity.BOTTOM);
+                new FrameLayout.LayoutParams(-1, dp(72), Gravity.BOTTOM);
         bottomSheetHost.addView(controls, controlsParams);
 
         root.addView(
@@ -466,7 +468,7 @@ public class MainActivity extends AppCompatActivity {
 
         exposureBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) setExposure(progress - 4);
+                if (fromUser) setExposure(exposureLower + progress);
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) { showLivePanelTemporarily(); }
             @Override public void onStopTrackingTouch(SeekBar seekBar) { scheduleLivePanelHide(); }
@@ -474,7 +476,16 @@ public class MainActivity extends AppCompatActivity {
 
         detailBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                detailText.setText("Ultra Detail " + progress + "%");
+                detailText.setText(progress >= 50 ? "Ultra Detail " + progress + "%" : "Detail normal " + progress + "%");
+                if (fromUser) {
+                    boolean requested = progress >= 50;
+                    if (requested != detailOn) {
+                        detailOn = requested;
+                        detailBtn.setText(detailOn ? "ULTRA\nDETAIL" : "DETAIL\nNORMAL");
+                        restartLivePreview();
+                        status.setText(detailOn ? "LIVE • Ultra Detail ON" : "LIVE • Detail normal");
+                    }
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar seekBar) { showLivePanelTemporarily(); }
             @Override public void onStopTrackingTouch(SeekBar seekBar) { scheduleLivePanelHide(); }
@@ -2005,7 +2016,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void scheduleLivePanelHide() {
         livePanelHandler.removeCallbacks(hideLivePanelRunnable);
-        if (!frozen) livePanelHandler.postDelayed(hideLivePanelRunnable, 3000);
+        if (!frozen) livePanelHandler.postDelayed(hideLivePanelRunnable, 1800);
     }
 
     private void showLivePanelTemporarily() {
@@ -2038,13 +2049,13 @@ public class MainActivity extends AppCompatActivity {
             // Keep the bottom camera/edit controls above Android's navigation bar
             // in BOTH LIVE and FREEZE modes. setFreezeFullscreen() must not reset this.
             int bottomPad = navigationBarBottomInset + dp(6);
-            controlsBar.setPadding(dp(4), dp(4), dp(4), bottomPad);
+            controlsBar.setPadding(dp(4), dp(2), dp(4), bottomPad);
 
             // The sheet content must grow with the system navigation inset so its
             // buttons are never clipped when the phone uses a 3-button navigation bar.
             ViewGroup.LayoutParams cp = controlsBar.getLayoutParams();
             if (cp != null) {
-                cp.height = dp(78) + navigationBarBottomInset;
+                cp.height = dp(72) + navigationBarBottomInset;
                 controlsBar.setLayoutParams(cp);
             }
 
@@ -2106,6 +2117,11 @@ public class MainActivity extends AppCompatActivity {
 
                 previewUseCase.setSurfaceProvider(preview.getSurfaceProvider());
                 updateZoomText();
+                android.util.Range<Integer> expRange = camera.getCameraInfo().getExposureState().getExposureCompensationRange();
+                exposureLower = expRange.getLower();
+                exposureUpper = expRange.getUpper();
+                int expSpan = Math.max(1, exposureUpper - exposureLower);
+                exposureBar.setMax(expSpan);
                 setExposure(0);
                 status.setText(detailOn ? "Kamera LIVE • Ultra Detail ON" : "Kamera LIVE • Detail normal");
                 setLivePanelVisible(true);
@@ -2174,11 +2190,15 @@ public class MainActivity extends AppCompatActivity {
 
     private void setExposure(int value) {
         if (camera == null) return;
-        int range = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getUpper();
-        int lower = camera.getCameraInfo().getExposureState().getExposureCompensationRange().getLower();
-        int clamped = Math.max(lower, Math.min(range, value));
+        android.util.Range<Integer> range = camera.getCameraInfo().getExposureState().getExposureCompensationRange();
+        exposureLower = range.getLower();
+        exposureUpper = range.getUpper();
+        int clamped = Math.max(exposureLower, Math.min(exposureUpper, value));
         camera.getCameraControl().setExposureCompensationIndex(clamped);
-        exposureBar.setProgress(clamped + 4);
+        if (exposureBar != null) {
+            exposureBar.setMax(Math.max(1, exposureUpper - exposureLower));
+            exposureBar.setProgress(clamped - exposureLower);
+        }
         exposureText.setText(clamped == 0 ? "Exposure 0 • NORMAL" : String.format("Exposure %+d", clamped));
     }
 
@@ -2207,7 +2227,7 @@ public class MainActivity extends AppCompatActivity {
             } else {
                 lp.width = 0;
                 lp.weight = 1f;
-                lp.height = dp(62);
+                lp.height = dp(56);
                 freezeBtn.setText("❄️\nBeku");
             }
             freezeBtn.setLayoutParams(lp);
