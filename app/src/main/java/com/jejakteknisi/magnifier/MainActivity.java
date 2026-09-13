@@ -34,9 +34,11 @@ import android.graphics.Path;
 import android.graphics.PointF;
 import android.graphics.RectF;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ScrollView;
+import android.widget.HorizontalScrollView;
 import android.widget.Toast;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -2366,76 +2368,271 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    // ========================= eMMC DATABASE V1 =========================
+    // ========================= eMMC DATABASE V2 =========================
+    private static class EmmcRecord {
+        String part, brand, capacity, grade, category, notes;
+        EmmcRecord(String part, String brand, String capacity, String grade, String category, String notes) {
+            this.part = part; this.brand = brand; this.capacity = capacity;
+            this.grade = grade; this.category = category; this.notes = notes;
+        }
+    }
+
+    private ArrayList<EmmcRecord> loadEmmcDatabase() {
+        ArrayList<EmmcRecord> rows = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        try (java.io.InputStream in = getAssets().open("emmc_database.csv");
+             java.io.BufferedReader br = new java.io.BufferedReader(new java.io.InputStreamReader(in))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.trim().isEmpty() || line.startsWith("#") || line.toLowerCase(Locale.US).startsWith("part_number,")) continue;
+                String[] p = line.split(",", -1);
+                if (p.length < 5) continue;
+                String part = p[0].trim();
+                String key = normalizeEmmc(part);
+                if (key.isEmpty() || seen.contains(key)) continue;
+                seen.add(key);
+                String brand = p.length > 1 ? p[1].trim() : "Tidak dicantumkan";
+                String capacity = p.length > 2 ? p[2].trim() : "Tidak dicantumkan";
+                String grade = p.length > 3 ? p[3].trim() : "Tidak dicantumkan";
+                String category = p.length > 4 ? p[4].trim() : "Tidak dicantumkan";
+                String notes = p.length > 5 ? p[5].trim() : "";
+                rows.add(new EmmcRecord(part, brand, capacity, grade, category, notes));
+            }
+        } catch (Exception e) {
+            status.setText("EMMC DB • gagal dibaca");
+        }
+        return rows;
+    }
+
+    private GradientDrawable roundedBg(int color, int strokeColor, int radiusDp) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(radiusDp));
+        if (strokeColor != Color.TRANSPARENT) g.setStroke(dp(1), strokeColor);
+        return g;
+    }
+
+    private Button emmcChip(String text, boolean selected) {
+        Button b = new Button(this);
+        b.setText(text);
+        b.setTextSize(12);
+        b.setTextColor(Color.WHITE);
+        b.setAllCaps(false);
+        b.setPadding(dp(14), 0, dp(14), 0);
+        b.setMinHeight(0); b.setMinWidth(0);
+        b.setBackground(roundedBg(selected ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55),
+                Color.rgb(0, 145, 255), 22));
+        return b;
+    }
+
+    private TextView emmcSectionTitle(String title, int count, boolean green) {
+        TextView t = new TextView(this);
+        t.setText(title + "   •   " + count + " kode");
+        t.setTextColor(Color.BLACK);
+        t.setTextSize(14);
+        t.setTypeface(null, Typeface.BOLD);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setPadding(dp(14), 0, dp(10), 0);
+        t.setBackground(roundedBg(green ? Color.rgb(70, 225, 125) : Color.rgb(255, 225, 35), Color.TRANSPARENT, 10));
+        return t;
+    }
+
     private void showEmmcDatabase() {
         if (emmcDialog != null && emmcDialog.isShowing()) return;
 
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(16), dp(8), dp(16), dp(4));
-        box.setBackgroundColor(Color.rgb(12, 15, 17));
+        final ArrayList<EmmcRecord> all = loadEmmcDatabase();
+        if (all.isEmpty()) {
+            Toast.makeText(this, "Database eMMC kosong.", Toast.LENGTH_LONG).show();
+            return;
+        }
 
-        TextView hint = makeInfoText("Cari part number eMMC");
-        hint.setGravity(Gravity.START);
-        hint.setTextSize(13);
-        box.addView(hint, new LinearLayout.LayoutParams(-1, dp(28)));
+        // Saat Database dibuka, sisakan kamera LIVE di belakang panel.
+        if (topBar != null) topBar.setVisibility(View.GONE);
+        if (infoRow != null) infoRow.setVisibility(View.GONE);
+        if (zoomBar != null) zoomBar.setVisibility(View.GONE);
+        if (exposureRow != null) exposureRow.setVisibility(View.GONE);
+        if (detailRow != null) detailRow.setVisibility(View.GONE);
+        if (controlsBar != null) controlsBar.setVisibility(View.GONE);
+        status.setText("LIVE • eMMC DATABASE");
 
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(12), dp(10), dp(12), dp(8));
+        panel.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 145, 255), 18));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("EMMC DATABASE");
+        title.setTextColor(Color.WHITE); title.setTextSize(18); title.setTypeface(null, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
+        TextView count = new TextView(this);
+        count.setText(all.size() + " kode unik");
+        count.setTextColor(Color.LTGRAY); count.setTextSize(11); count.setGravity(Gravity.CENTER);
+        header.addView(count, new LinearLayout.LayoutParams(dp(85), dp(42)));
+        panel.addView(header);
+
+        LinearLayout searchRow = new LinearLayout(this);
+        searchRow.setGravity(Gravity.CENTER_VERTICAL);
         EditText code = new EditText(this);
-        code.setHint("Contoh: KLM8G1GETF-B041");
         code.setSingleLine(true);
-        code.setTextColor(Color.WHITE);
-        code.setHintTextColor(Color.LTGRAY);
-        code.setTextSize(16);
-        code.setPadding(dp(10), 0, dp(10), 0);
-        code.setBackgroundColor(Color.rgb(35, 40, 44));
-        box.addView(code, new LinearLayout.LayoutParams(-1, dp(52)));
+        code.setHint("Cari kode eMMC...");
+        code.setTextColor(Color.WHITE); code.setHintTextColor(Color.rgb(150, 175, 200)); code.setTextSize(15);
+        code.setPadding(dp(14), 0, dp(10), 0);
+        code.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 145, 255), 24));
+        searchRow.addView(code, new LinearLayout.LayoutParams(0, dp(50), 1));
+        Button voice = makeButton("🎙");
+        voice.setTextSize(20);
+        searchRow.addView(voice, new LinearLayout.LayoutParams(dp(58), dp(50)));
+        panel.addView(searchRow);
 
-        LinearLayout buttons = new LinearLayout(this);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
-        buttons.setGravity(Gravity.CENTER);
-        buttons.setPadding(0, dp(8), 0, dp(4));
+        HorizontalScrollView filterScroll = new HorizontalScrollView(this);
+        filterScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout filters = new LinearLayout(this);
+        filters.setGravity(Gravity.CENTER_VERTICAL);
+        filters.setPadding(0, dp(7), 0, dp(7));
+        String[] filterNames = {"Semua", "A+++", "A++", "A+B", "A+", "Pilihan", "Samsung / A Khusus"};
+        ArrayList<Button> filterButtons = new ArrayList<>();
+        for (String f : filterNames) {
+            Button chip = emmcChip(f, f.equals("Semua"));
+            filterButtons.add(chip);
+            filters.addView(chip, new LinearLayout.LayoutParams(-2, dp(38)) {{ leftMargin = dp(4); rightMargin = dp(4); }});
+        }
+        filterScroll.addView(filters);
+        panel.addView(filterScroll);
 
-        Button search = makeButton("🔎\nCARI");
-        Button voice = makeButton("🎙\nVOICE");
-        Button scan = makeButton("📸\nSCAN OCR");
-        buttons.addView(search, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        buttons.addView(voice, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        buttons.addView(scan, new LinearLayout.LayoutParams(0, dp(58), 1f));
-        box.addView(buttons);
+        TextView summary = new TextView(this);
+        summary.setTextColor(Color.LTGRAY); summary.setTextSize(11);
+        summary.setPadding(dp(4), 0, dp(4), dp(5));
+        panel.addView(summary);
 
-        TextView result = new TextView(this);
-        result.setTextColor(Color.WHITE);
-        result.setTextSize(14);
-        result.setPadding(dp(10), dp(12), dp(10), dp(12));
-        result.setGravity(Gravity.START);
-        result.setText("Belum ada pencarian.");
-        result.setBackgroundColor(Color.rgb(24, 28, 31));
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(result);
-        box.addView(scroll, new LinearLayout.LayoutParams(-1, dp(190)));
+        ScrollView resultScroll = new ScrollView(this);
+        LinearLayout results = new LinearLayout(this);
+        results.setOrientation(LinearLayout.VERTICAL);
+        resultScroll.addView(results);
+        panel.addView(resultScroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
         TextView footer = new TextView(this);
-        footer.setText("Offline • Database lokal • Foto OCR tidak disimpan ke Galeri");
-        footer.setTextColor(Color.LTGRAY);
-        footer.setTextSize(11);
-        footer.setPadding(dp(4), dp(8), dp(4), dp(2));
-        box.addView(footer);
+        footer.setText("Keterangan: EMMC/CPU gantian, tergores, sompel, auto retur");
+        footer.setTextColor(Color.rgb(160, 190, 215)); footer.setTextSize(10);
+        footer.setPadding(dp(4), dp(6), dp(4), 0);
+        panel.addView(footer);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("eMMC DATABASE • V1")
-                .setView(box)
-                .setNegativeButton("Tutup", null)
-                .create();
-        emmcDialog = dialog;
+        final String[] activeFilter = {"Semua"};
 
-        search.setOnClickListener(v -> searchEmmc(code.getText().toString(), result));
+        Runnable render = () -> {
+            String q = normalizeEmmc(code.getText().toString());
+            results.removeAllViews();
+            java.util.LinkedHashMap<String, ArrayList<EmmcRecord>> grouped = new java.util.LinkedHashMap<>();
+            int matches = 0;
+            for (EmmcRecord r : all) {
+                if (!matchesEmmcFilter(r.category, activeFilter[0])) continue;
+                if (!q.isEmpty()) {
+                    String hay = normalizeEmmc(r.part + r.category + r.brand + r.capacity);
+                    if (!hay.contains(q)) continue;
+                }
+                if (!grouped.containsKey(r.category)) grouped.put(r.category, new ArrayList<>());
+                grouped.get(r.category).add(r); matches++;
+            }
+            summary.setText(matches + " hasil" + (q.isEmpty() ? "" : " untuk \"" + code.getText().toString().trim() + "\""));
+            if (matches == 0) {
+                TextView empty = new TextView(this);
+                empty.setText("Kode tidak ditemukan. Coba ketik ulang, gunakan VOICE, atau pilih kategori lain.");
+                empty.setTextColor(Color.LTGRAY); empty.setTextSize(13);
+                empty.setGravity(Gravity.CENTER); empty.setPadding(dp(18), dp(35), dp(18), dp(35));
+                results.addView(empty); return;
+            }
+            for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
+                String cat = entry.getKey();
+                ArrayList<EmmcRecord> rows = entry.getValue();
+                boolean green = cat.startsWith("Pilihan") || cat.startsWith("A+B");
+                TextView section = emmcSectionTitle(cat, rows.size(), green);
+                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(38));
+                sp.setMargins(dp(2), dp(5), dp(2), dp(3));
+                results.addView(section, sp);
+                for (EmmcRecord r : rows) {
+                    TextView item = new TextView(this);
+                    item.setText("▸  " + r.part);
+                    item.setTextColor(Color.WHITE); item.setTextSize(14);
+                    item.setGravity(Gravity.CENTER_VERTICAL); item.setPadding(dp(12), 0, dp(8), 0);
+                    item.setBackground(roundedBg(Color.rgb(6, 34, 61), Color.rgb(0, 75, 125), 8));
+                    item.setOnClickListener(v -> showEmmcDetail(r));
+                    LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, dp(40));
+                    ip.setMargins(dp(2), dp(2), dp(2), dp(2));
+                    results.addView(item, ip);
+                }
+            }
+        };
+
+        for (int i = 0; i < filterButtons.size(); i++) {
+            final int index = i;
+            filterButtons.get(i).setOnClickListener(v -> {
+                activeFilter[0] = filterNames[index];
+                for (int j = 0; j < filterButtons.size(); j++) {
+                    Button b = filterButtons.get(j);
+                    boolean sel = j == index;
+                    b.setBackground(roundedBg(sel ? Color.rgb(0, 130, 255) : Color.rgb(8, 30, 55), Color.rgb(0, 145, 255), 22));
+                }
+                render.run();
+            });
+        }
+        code.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
+            public void onTextChanged(CharSequence s, int st, int before, int count2) { render.run(); }
+            public void afterTextChanged(android.text.Editable e) {}
+        });
         voice.setOnClickListener(v -> startEmmcVoice(code));
-        scan.setOnClickListener(v -> scanEmmcOcr(code, result));
+        render.run();
+
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
+        emmcDialog = dialog;
         dialog.setOnShowListener(d -> {
-            dialog.getWindow().setLayout(-1, -2);
+            android.view.Window w = dialog.getWindow();
+            if (w != null) {
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                w.setDimAmount(0.0f);
+                w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.64f));
+                w.setGravity(Gravity.BOTTOM);
+            }
+        });
+        dialog.setOnDismissListener(d -> {
+            emmcDialog = null;
+            setLivePanelVisible(true);
+            scheduleLivePanelHide();
+            status.setText("LIVE • Kamera siap");
         });
         dialog.show();
+        android.view.Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            w.setDimAmount(0.0f);
+            w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.64f));
+            w.setGravity(Gravity.BOTTOM);
+        }
+    }
+
+    private boolean matchesEmmcFilter(String category, String filter) {
+        if ("Semua".equals(filter)) return true;
+        if ("Pilihan".equals(filter)) return category.startsWith("Pilihan");
+        if ("Samsung / A Khusus".equals(filter)) return category.equalsIgnoreCase("A+ Samsung/A Khusus");
+        return category.startsWith(filter);
+    }
+
+    private void showEmmcDetail(EmmcRecord r) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL); box.setPadding(dp(6), dp(4), dp(6), dp(4));
+        String[] labels = {"Part Number", "Kapasitas", "Grade", "Kategori", "Brand", "Catatan"};
+        String[] values = {r.part, r.capacity, r.grade, r.category, r.brand, r.notes};
+        for (int i = 0; i < labels.length; i++) {
+            TextView t = new TextView(this);
+            t.setText(labels[i] + "\n" + (values[i] == null || values[i].isEmpty() ? "Tidak dicantumkan" : values[i]));
+            t.setTextColor(Color.WHITE); t.setTextSize(i == 0 ? 16 : 13);
+            t.setTypeface(null, i == 0 ? Typeface.BOLD : Typeface.NORMAL);
+            t.setPadding(dp(8), dp(7), dp(8), dp(7));
+            box.addView(t);
+        }
+        new AlertDialog.Builder(this).setTitle("Detail eMMC").setView(box).setPositiveButton("Tutup", null).show();
     }
 
     private void searchEmmc(String raw, TextView result) {

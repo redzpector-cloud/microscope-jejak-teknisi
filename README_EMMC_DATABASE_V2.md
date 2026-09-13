@@ -1,4 +1,4 @@
-# EMMC DATABASE V2
+# EMMC DATABASE V2 — UI + DATABASE
 
 Database digabung dari database starter + file `EMMC_database_teks_biasa`.
 
@@ -9,6 +9,8 @@ Database digabung dari database starter + file `EMMC_database_teks_biasa`.
 - Tanda `?` pada kode dipertahankan karena sumber tidak cukup jelas.
 
 Total kode unik: 272
+
+Aplikasi: V3.4.2
 
 - Legacy / starter: 7
 - A+++ 256: 5
@@ -27,3 +29,14 @@ Total kode unik: 272
 - Pilihan 16: 17
 - Pilihan 8GB: 2
 - A+ Samsung/A Khusus: 4
+
+
+## UI V2
+- Kamera microscope tetap LIVE di bagian atas saat Database dibuka.
+- Panel database muncul dari bawah tanpa menutup preview kamera.
+- Pencarian real-time berdasarkan kode, kategori, brand, dan kapasitas.
+- Voice input tetap tersedia.
+- Filter: Semua, A+++, A++, A+B, A+, Pilihan, Samsung / A Khusus.
+- Kode dikelompokkan berdasarkan kategori sumber.
+- Ketuk kode untuk melihat detail.
+- Saat ditutup, kontrol microscope dikembalikan.
