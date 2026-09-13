@@ -15,6 +15,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.view.Gravity;
+import android.animation.ValueAnimator;
 import android.view.MotionEvent;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -2483,6 +2484,15 @@ public class MainActivity extends AppCompatActivity {
         panel.setPadding(dp(12), dp(8), dp(12), dp(6));
         panel.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 145, 255), 18));
 
+        // Drag handle untuk bottom sheet
+        TextView dragHandle = new TextView(this);
+        dragHandle.setText("━");
+        dragHandle.setTextColor(Color.rgb(150, 185, 215));
+        dragHandle.setTextSize(24);
+        dragHandle.setGravity(Gravity.CENTER);
+        dragHandle.setPadding(0, 0, 0, dp(2));
+        panel.addView(dragHandle, new LinearLayout.LayoutParams(-1, dp(24)));
+
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(this);
@@ -2660,14 +2670,72 @@ public class MainActivity extends AppCompatActivity {
 
         AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
         emmcDialog = dialog;
+
+        // Bottom sheet: mulai rendah supaya kamera lebih luas.
+        final int screenHeight = getResources().getDisplayMetrics().heightPixels;
+        final int minSheet = (int)(screenHeight * 0.38f);
+        final int startSheet = (int)(screenHeight * 0.50f);
+        final int midSheet = (int)(screenHeight * 0.62f);
+        final int maxSheet = (int)(screenHeight * 0.78f);
+
         dialog.setOnShowListener(d -> {
             android.view.Window w = dialog.getWindow();
             if (w != null) {
                 w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 w.setDimAmount(0.0f);
                 w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-                w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.67f));
                 w.setGravity(Gravity.BOTTOM);
+                w.setLayout(-1, startSheet);
+
+                // Drag pada handle: tinggi sheet mengikuti gerakan jari.
+                dragHandle.setOnTouchListener(new View.OnTouchListener() {
+                    float downY;
+                    int downHeight;
+                    boolean moved;
+
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        android.view.Window window = dialog.getWindow();
+                        if (window == null) return true;
+
+                        switch (event.getActionMasked()) {
+                            case MotionEvent.ACTION_DOWN:
+                                downY = event.getRawY();
+                                downHeight = window.getAttributes().height;
+                                moved = false;
+                                return true;
+
+                            case MotionEvent.ACTION_MOVE:
+                                float dy = event.getRawY() - downY;
+                                int newHeight = (int)(downHeight - dy);
+                                newHeight = Math.max(minSheet, Math.min(maxSheet, newHeight));
+                                if (Math.abs(dy) > dp(4)) moved = true;
+                                window.setLayout(-1, newHeight);
+                                return true;
+
+                            case MotionEvent.ACTION_UP:
+                            case MotionEvent.ACTION_CANCEL:
+                                int current = window.getAttributes().height;
+                                int target;
+                                int dStart = Math.abs(current - minSheet);
+                                int dMid = Math.abs(current - midSheet);
+                                int dMax = Math.abs(current - maxSheet);
+                                target = minSheet;
+                                if (dMid < dStart) target = midSheet;
+                                if (dMax < Math.min(dStart, dMid)) target = maxSheet;
+
+                                ValueAnimator animator = ValueAnimator.ofInt(current, target);
+                                animator.setDuration(220);
+                                animator.addUpdateListener(a -> {
+                                    android.view.Window ww = dialog.getWindow();
+                                    if (ww != null) ww.setLayout(-1, (Integer)a.getAnimatedValue());
+                                });
+                                animator.start();
+                                return true;
+                        }
+                        return true;
+                    }
+                });
             }
         });
         dialog.setOnDismissListener(d -> {
@@ -2682,7 +2750,7 @@ public class MainActivity extends AppCompatActivity {
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             w.setDimAmount(0.0f);
-            w.setLayout(-1, (int)(getResources().getDisplayMetrics().heightPixels * 0.67f));
+            w.setLayout(-1, startSheet);
             w.setGravity(Gravity.BOTTOM);
         }
     }
