@@ -950,10 +950,16 @@ public class MainActivity extends AppCompatActivity {
             // mencegah aplikasi keluar saat memutar foto microscope beresolusi besar.
             Bitmap rotated = Bitmap.createBitmap(old, 0, 0, old.getWidth(), old.getHeight(), m, true);
             if (rotated == null) throw new IllegalStateException("Bitmap rotate null");
+            // Keep existing annotations when the base image is rotated.
+            // Bitmap.createBitmap(..., 90°) changes the source coordinate system,
+            // so every annotation must be transformed to the new width/height.
+            if (annotationView != null && !annotationView.items.isEmpty()) {
+                annotationView.pushUndo();
+                annotationView.transformAnnotationsForRotate(old.getWidth(), old.getHeight());
+            }
             frozenBitmap = rotated;
             frozenZoom=1f; frozenPanX=0f; frozenPanY=0f;
             if (zoomBar != null) zoomBar.setProgress(0);
-            if (annotationView != null) annotationView.clearAll();
             updateFrozenImage();
             if (freezeView != null) {
                 freezeView.setImageBitmap(frozenBitmap);
@@ -1349,6 +1355,30 @@ public class MainActivity extends AppCompatActivity {
         boolean hasSelectedText(){ return selected!=null && selected.type==AnnotationMode.TEXT; }
         Annotation getSelectedText(){ return selected; }
         void changeSelectedText(String value){ if(hasSelectedText()){ pushUndo(); selected.text=value; invalidate(); } }
+
+        // Android's 90° rotation used by rotateFrozenImage maps an old source
+        // point (x,y) to the new bitmap as (oldHeight-y, x). Preserve every
+        // annotation instead of clearing the technician's markings.
+        private PointF rotatePoint90(PointF p, int oldW, int oldH) {
+            return new PointF(oldH - p.y, p.x);
+        }
+
+        void transformAnnotationsForRotate(int oldW, int oldH) {
+            for (Annotation a : items) {
+                if (a.type == AnnotationMode.PEN && a.points != null) {
+                    for (int i = 0; i < a.points.size(); i++) {
+                        a.points.set(i, rotatePoint90(a.points.get(i), oldW, oldH));
+                    }
+                } else {
+                    PointF p1 = rotatePoint90(new PointF(a.x1, a.y1), oldW, oldH);
+                    PointF p2 = rotatePoint90(new PointF(a.x2, a.y2), oldW, oldH);
+                    a.x1 = p1.x; a.y1 = p1.y;
+                    a.x2 = p2.x; a.y2 = p2.y;
+                }
+                a.rotation = (a.rotation + 90f) % 360f;
+            }
+            invalidate();
+        }
 
         private float[] viewToSource(float x, float y) {
             Matrix inv = new Matrix();
