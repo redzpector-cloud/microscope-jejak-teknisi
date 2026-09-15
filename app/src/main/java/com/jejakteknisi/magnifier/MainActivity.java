@@ -1076,7 +1076,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.5");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.8");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1170,10 +1170,10 @@ public class MainActivity extends AppCompatActivity {
         Uri uri = result == null ? null : saveBitmapToGallery(result);
         if (uri == null) return;
         Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("image/jpeg");
+        intent.setType("image/png");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.5"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.8"));
     }
 
     private class OverlayView extends View {
@@ -2453,15 +2453,15 @@ public class MainActivity extends AppCompatActivity {
     private Uri saveBitmapToGallery(Bitmap bitmap) {
         if (bitmap == null) return null;
         try {
-            String name = "JejakTeknisi_" + System.currentTimeMillis() + ".jpg";
+            String name = "JejakTeknisi_" + System.currentTimeMillis() + ".png";
             ContentValues values = new ContentValues();
             values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
-            values.put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg");
+            values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
             values.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/JejakTeknisi/Microscope");
             Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
             if (uri == null) { status.setText("Gagal menyimpan foto"); return null; }
             try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
-                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 98, out)) {
+                if (out == null || !bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
                     status.setText("Gagal menyimpan foto"); return null;
                 }
             }
@@ -2581,7 +2581,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendToGoogleLens(Uri uri) {
         Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("image/jpeg");
+        intent.setType("image/png");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.setPackage("com.google.android.googlequicksearchbox");
