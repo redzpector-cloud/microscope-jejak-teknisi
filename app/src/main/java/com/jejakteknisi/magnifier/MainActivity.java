@@ -1549,6 +1549,23 @@ public class MainActivity extends AppCompatActivity {
             if (mode == AnnotationMode.SELECT && selected != null) drawSelectionOverlay(canvas, selected);
         }
 
+        private String annotationTypeLabel(Annotation a) {
+            if (a == null) return "Objek";
+            switch (a.type) {
+                case PEN: return "Pena";
+                case MARKER: return "Marker";
+                case ARROW: return "Panah";
+                case LINE: return "Garis";
+                case CIRCLE: return "Lingkaran";
+                case RECT: return "Kotak";
+                case HIGHLIGHT: return "Highlight";
+                case TEXT: return "Teks";
+                case OCR: return "OCR";
+                case JUMPER: return "Jumper";
+                default: return "Objek";
+            }
+        }
+
         private void drawSelectionOverlay(Canvas canvas, Annotation a) {
             float[] box = annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
@@ -1572,6 +1589,19 @@ public class MainActivity extends AppCompatActivity {
             sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
             sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
+
+            // Small object badge makes the current selection obvious on a phone.
+            sp.setTypeface(Typeface.DEFAULT_BOLD);
+            sp.setTextSize(dp(11));
+            String objectText = annotationTypeLabel(a);
+            float ow = sp.measureText(objectText);
+            float ox = Math.max(dp(8), Math.min(getWidth()-ow-dp(8), l));
+            float oy = Math.max(dp(18), t-dp(36));
+            sp.setStyle(Paint.Style.FILL);
+            sp.setColor(Color.argb(205,0,0,0));
+            canvas.drawRoundRect(ox-dp(5), oy-dp(14), ox+ow+dp(5), oy+dp(4), dp(6), dp(6), sp);
+            sp.setColor(Color.WHITE);
+            canvas.drawText(objectText, ox, oy, sp);
 
             // Rotation angle is shown only while the user is actively rotating.
             // This keeps the editor clean while still giving precise feedback.
@@ -1917,7 +1947,7 @@ public class MainActivity extends AppCompatActivity {
                 // finger started on a resize/rotation handle.
                 if (selected!=null && e.getPointerCount()>=2 &&
                         (action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_POINTER_UP)) {
-                    if (!transformingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
+                    if (!transformingSelected) {
                         pushUndo();
                         transformingSelected=true;
                         rotatingSelected=true;
