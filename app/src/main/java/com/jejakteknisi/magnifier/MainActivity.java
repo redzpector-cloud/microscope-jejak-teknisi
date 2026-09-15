@@ -823,7 +823,7 @@ public class MainActivity extends AppCompatActivity {
                 setAnnotationMode(AnnotationMode.SELECT, "Edit aktif • tap teks yang ingin diubah");
             }
         });
-        clear.setOnClickListener(v -> { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); });
+        clear.setOnClickListener(v -> { if (annotationView.deleteSelected()) status.setText("Objek terpilih dihapus"); else { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); } });
         save.setOnClickListener(v -> saveAnnotatedFreeze());
         share.setOnClickListener(v -> shareAnnotatedFreeze());
 
@@ -1111,7 +1111,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.9");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.9.0");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1208,7 +1208,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/png");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.9"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.9.0"));
     }
 
     private class OverlayView extends View {
@@ -1407,6 +1407,14 @@ public class MainActivity extends AppCompatActivity {
             undoStack.push(copyItems()); items.clear(); items.addAll(redoStack.pop()); selected=null; invalidate();
         }
         void clearAll() { if (!items.isEmpty()) pushUndo(); items.clear(); selected=null; invalidate(); }
+        boolean deleteSelected() {
+            if (selected == null) return false;
+            pushUndo();
+            items.remove(selected);
+            selected = null;
+            invalidate();
+            return true;
+        }
         boolean duplicateSelected() {
             if (selected==null) return false;
             pushUndo(); Annotation c=selected.copy(); float dx=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
