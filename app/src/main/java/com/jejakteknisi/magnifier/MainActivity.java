@@ -1911,6 +1911,45 @@ public class MainActivity extends AppCompatActivity {
             }
             if (mode==AnnotationMode.SELECT) {
                 int action=e.getActionMasked();
+
+                // Multi-touch gets priority over single-handle transforms so a two-finger
+                // rotate/scale gesture can always take over cleanly, even if the first
+                // finger started on a resize/rotation handle.
+                if (selected!=null && e.getPointerCount()>=2 &&
+                        (action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_POINTER_UP)) {
+                    if (!transformingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
+                        pushUndo();
+                        transformingSelected=true;
+                        rotatingSelected=true;
+                        selectedHandle=0;
+                        float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
+                        lastRotateAngle=(float)Math.toDegrees(Math.atan2(y1-y0,x1-x0));
+                        lastTransformDistance=(float)Math.hypot(x1-x0,y1-y0);
+                    } else if (action==MotionEvent.ACTION_MOVE) {
+                        float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
+                        float angle=(float)Math.toDegrees(Math.atan2(y1-y0,x1-x0));
+                        float dist=(float)Math.hypot(x1-x0,y1-y0);
+                        float delta=angle-lastRotateAngle;
+                        while(delta>180f) delta-=360f;
+                        while(delta<-180f) delta+=360f;
+                        selected.rotation+=delta;
+                        float factor=dist/Math.max(1f,lastTransformDistance);
+                        if (Math.abs(factor-1f)>0.003f) {
+                            selected.size=Math.max(2f,Math.min(20f,selected.size*factor));
+                            lastTransformDistance=dist;
+                        }
+                        lastRotateAngle=angle;
+                        invalidate();
+                    }
+                    if(action==MotionEvent.ACTION_POINTER_UP) {
+                        rotatingSelected=false;
+                        transformingSelected=false;
+                        selectedHandle=0;
+                        transformStart=null;
+                    }
+                    return true;
+                }
+
                 if (action==MotionEvent.ACTION_DOWN) {
                     // If the current object is already selected, give its handles priority.
                     if(selected!=null) {
@@ -1957,34 +1996,6 @@ public class MainActivity extends AppCompatActivity {
                         scaleAnnotationFromStart(selected,transformStart,sx,sy);
                     }
                     invalidate(); return true;
-                }
-                if (selected!=null && e.getPointerCount()>=2 &&
-                        (action==MotionEvent.ACTION_POINTER_DOWN || action==MotionEvent.ACTION_MOVE || action==MotionEvent.ACTION_POINTER_UP)) {
-                    if (e.getPointerCount()>=2) {
-                        float x0=e.getX(0), y0=e.getY(0), x1=e.getX(1), y1=e.getY(1);
-                        float angle=(float)Math.toDegrees(Math.atan2(y1-y0,x1-x0));
-                        float dist=(float)Math.hypot(x1-x0,y1-y0);
-                        if (!transformingSelected || action==MotionEvent.ACTION_POINTER_DOWN) {
-                            pushUndo();
-                            lastRotateAngle=angle; lastTransformDistance=dist;
-                            rotatingSelected=true; transformingSelected=true;
-                        } else {
-                            float delta=angle-lastRotateAngle;
-                            while(delta>180f) delta-=360f; while(delta<-180f) delta+=360f;
-                            selected.rotation+=delta;
-                            float factor=dist/Math.max(1f,lastTransformDistance);
-                            if (Math.abs(factor-1f)>0.003f) {
-                                float minSize=2f, maxSize=20f;
-                                selected.size=Math.max(minSize,Math.min(maxSize,selected.size*factor));
-                                lastTransformDistance=dist;
-                            }
-                            lastRotateAngle=angle; invalidate();
-                        }
-                    }
-                    if(action==MotionEvent.ACTION_POINTER_UP) {
-                        rotatingSelected=false; transformingSelected=false; lastSelectX=x; lastSelectY=y;
-                    }
-                    return true;
                 }
                 if(action==MotionEvent.ACTION_MOVE && selected!=null && !rotatingSelected) {
                     if (!moveHistoryPushed) { pushUndo(); moveHistoryPushed=true; }
