@@ -948,9 +948,16 @@ public class MainActivity extends AppCompatActivity {
         Bitmap old=frozenBitmap;
         try {
             Bitmap cropped=Bitmap.createBitmap(old,left,top,w,h);
+            // Keep annotations that were already placed on the image. Crop changes
+            // the source coordinate origin, so translate every object into the new
+            // bitmap coordinate system instead of deleting the technician's work.
+            if(annotationView!=null && !annotationView.items.isEmpty()) {
+                annotationView.pushUndo();
+                annotationView.transformAnnotationsForCrop(left, top);
+            }
             frozenBitmap=cropped; frozenZoom=1f; frozenPanX=0f; frozenPanY=0f;
             if(zoomBar!=null) zoomBar.setProgress(0);
-            if(annotationView!=null) { annotationView.clearAll(); annotationView.setMode(AnnotationMode.SELECT); }
+            if(annotationView!=null) annotationView.setMode(AnnotationMode.SELECT);
             updateFrozenImage();
             if(freezeView!=null){ freezeView.setImageBitmap(frozenBitmap); freezeView.invalidate(); }
             status.setText("Crop diterapkan • area baru siap diedit");
@@ -1033,7 +1040,8 @@ public class MainActivity extends AppCompatActivity {
             frozenBitmap = out;
             frozenZoom=1f; frozenPanX=0f; frozenPanY=0f;
             if (zoomBar != null) zoomBar.setProgress(0);
-            if (annotationView != null) annotationView.clearAll();
+            // Brightness/contrast/sharpening do not change image dimensions or
+            // coordinates, so existing annotations remain valid and visible.
             updateFrozenImage();
             status.setText("Detail gambar diterapkan");
         } catch (Exception e) { status.setText("Pengaturan gambar gagal"); }
@@ -1378,6 +1386,23 @@ public class MainActivity extends AppCompatActivity {
         // annotation instead of clearing the technician's markings.
         private PointF rotatePoint90(PointF p, int oldW, int oldH) {
             return new PointF(oldH - p.y, p.x);
+        }
+
+        // Crop changes the source origin from (left,top) to (0,0). Translate
+        // every annotation, including freehand PEN points, into the new space.
+        void transformAnnotationsForCrop(int left, int top) {
+            for (Annotation a : items) {
+                if (a.type == AnnotationMode.PEN && a.points != null) {
+                    for (PointF p : a.points) {
+                        p.x -= left;
+                        p.y -= top;
+                    }
+                } else {
+                    a.x1 -= left; a.y1 -= top;
+                    a.x2 -= left; a.y2 -= top;
+                }
+            }
+            invalidate();
         }
 
         void transformAnnotationsForRotate(int oldW, int oldH) {
