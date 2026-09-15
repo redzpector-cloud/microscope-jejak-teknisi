@@ -1,9 +1,8 @@
-# Jejak Teknisi Microscope V3.8.3 — Build Fix
+# Jejak Teknisi Microscope V3.8.3 - BUILD FIX 4
 
-Perbaikan khusus GitHub Actions:
-- Menghapus `android-actions/setup-android@v3` yang menyebabkan `Failed to find package 'tools'`.
-- Menggunakan Android SDK bawaan GitHub Actions runner.
-- Menyiapkan hanya `platform-tools`, `platforms;android-35`, dan `build-tools;35.0.0`.
-- Java 17 dan Gradle 8.9 tetap digunakan.
+Perbaikan workflow GitHub Actions.
 
-Kode aplikasi V3.8.3 tidak diubah pada patch ini.
+Workflow TIDAK menggunakan `android-actions/setup-android@v3` dan tidak meminta package SDK bernama `tools`.
+Runner GitHub menggunakan Android SDK yang sudah tersedia, kemudian Gradle 8.9 digunakan untuk build.
+
+Jika log Actions masih menampilkan `android-actions/setup-android/v3`, berarti GitHub sedang menjalankan workflow lama dari repository, bukan file `.github/workflows/main.yml` dari ZIP ini.
