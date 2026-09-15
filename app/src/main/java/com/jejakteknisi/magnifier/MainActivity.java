@@ -1621,6 +1621,25 @@ public class MainActivity extends AppCompatActivity {
             sp.setColor(Color.WHITE);
             canvas.drawText(objectText, ox, oy, sp);
 
+            // Jumper PRO endpoint markers: A = source pad, B = destination pad.
+            // They are shown only for a selected jumper so the edit screen stays clean.
+            if (a.type==AnnotationMode.JUMPER) {
+                float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                double rad=Math.toRadians(a.rotation), cs=Math.cos(rad), sn=Math.sin(rad);
+                float ax=(float)(cx+(a.x1-cx)*cs-(a.y1-cy)*sn);
+                float ay=(float)(cy+(a.x1-cx)*sn+(a.y1-cy)*cs);
+                float bx=(float)(cx+(a.x2-cx)*cs-(a.y2-cy)*sn);
+                float by=(float)(cy+(a.x2-cx)*sn+(a.y2-cy)*cs);
+                float[] av=sourceToView(ax,ay), bv=sourceToView(bx,by);
+                Paint ep=new Paint(Paint.ANTI_ALIAS_FLAG);
+                ep.setStyle(Paint.Style.FILL); ep.setTypeface(Typeface.DEFAULT_BOLD); ep.setTextSize(dp(11));
+                ep.setColor(Color.BLACK);
+                canvas.drawCircle(av[0],av[1],dp(15),ep); canvas.drawCircle(bv[0],bv[1],dp(15),ep);
+                ep.setColor(Color.WHITE);
+                canvas.drawText("A",av[0]-dp(4),av[1]+dp(4),ep);
+                canvas.drawText("B",bv[0]-dp(4),bv[1]+dp(4),ep);
+            }
+
             // Rotation angle is shown only while the user is actively rotating.
             // This keeps the editor clean while still giving precise feedback.
             if (rotatingSelected) {
@@ -1772,7 +1791,10 @@ public class MainActivity extends AppCompatActivity {
             } else if (a.type==AnnotationMode.LINE) {
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
             } else if (a.type==AnnotationMode.JUMPER) {
-                // Technician jumper: visible insulated wire plus two pad endpoints.
+                // Jumper PRO: insulated wire + clearly visible A/B pad endpoints.
+                canvas.save();
+                float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+                canvas.rotate(a.rotation, cx, cy);
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeCap(Paint.Cap.ROUND);
                 paint.setStrokeWidth(dp(6) * scale);
@@ -1787,6 +1809,7 @@ public class MainActivity extends AppCompatActivity {
                 paint.setColor(Color.WHITE);
                 canvas.drawCircle(a.x1,a.y1,rr+dp(2) * scale,paint);
                 canvas.drawCircle(a.x2,a.y2,rr+dp(2) * scale,paint);
+                canvas.restore();
             } else if (a.type==AnnotationMode.CIRCLE) {
                 canvas.drawOval(new RectF(Math.min(a.x1,a.x2),Math.min(a.y1,a.y2),Math.max(a.x1,a.x2),Math.max(a.y1,a.y2)),paint);
             } else if (a.type==AnnotationMode.RECT) {
@@ -1862,6 +1885,10 @@ public class MainActivity extends AppCompatActivity {
                         tx=(float)(cx+dx*cs-dy*sn); ty=(float)(cy+dx*sn+dy*cs);
                     }
                     float tol=tolerance + dp(a.type==AnnotationMode.HIGHLIGHT?12:4)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                    if (a.type==AnnotationMode.JUMPER) {
+                        float endTol=tol + dp(12)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
+                        if (Math.hypot(tx-a.x1,ty-a.y1)<=endTol || Math.hypot(tx-a.x2,ty-a.y2)<=endTol) return a;
+                    }
                     if (distancePointToSegment(tx,ty,a.x1,a.y1,a.x2,a.y2)<=tol) return a;
                     if (a.type==AnnotationMode.ARROW) {
                         float len=dp(18);
