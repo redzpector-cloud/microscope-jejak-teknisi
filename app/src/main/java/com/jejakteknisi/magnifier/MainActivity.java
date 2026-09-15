@@ -793,7 +793,7 @@ public class MainActivity extends AppCompatActivity {
         line.setOnClickListener(v -> setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"));
         rect.setOnClickListener(v -> setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"));
         highlight.setOnClickListener(v -> setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"));
-        jumper.setOnClickListener(v -> setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tap pad awal lalu tap pad tujuan • 2 jari untuk zoom"));
+        jumper.setOnClickListener(v -> setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tarik A → B • warna & ukuran mengikuti pilihan"));
         crop.setOnClickListener(v -> {
             if (annotationMode == AnnotationMode.CROP && annotationView != null && annotationView.cropSelecting) {
                 applyCropSelection(annotationView.cropStartX, annotationView.cropStartY, annotationView.cropEndX, annotationView.cropEndY);
@@ -844,7 +844,7 @@ public class MainActivity extends AppCompatActivity {
         line.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.LINE, "Garis aktif • tarik dari titik awal ke titik akhir"); });
         rect.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.RECT, "Kotak aktif • tarik mengelilingi area"); });
         highlight.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"); });
-        jumper.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tap pad awal lalu tap pad tujuan • 2 jari untuk zoom"); });
+        jumper.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tarik A → B • warna & ukuran mengikuti pilihan"); });
         text.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"); });
         select.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • tap objek • geser, tarik handle, atau putar dengan 2 jari"); });
         pan.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"); });
@@ -1209,7 +1209,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/png");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.9.0"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • Jejak Teknisi"));
     }
 
     private class OverlayView extends View {
@@ -1385,12 +1385,12 @@ public class MainActivity extends AppCompatActivity {
         }
         void setColor(int color) {
             currentColor=color;
-            if (selected != null) { pushUndo(); selected.color=color; }
+            if (selected != null && selected.color != color) { pushUndo(); selected.color=color; }
             invalidate();
         }
         void setSize(float size) {
             strokeDp=size;
-            if (selected != null) { pushUndo(); selected.size=size; }
+            if (selected != null && Math.abs(selected.size-size) > 0.01f) { pushUndo(); selected.size=size; }
             invalidate();
         }
 
@@ -2007,7 +2007,7 @@ public class MainActivity extends AppCompatActivity {
                     float distance=(float)Math.hypot(b[0]-a[0], b[1]-a[1]);
                     if (distance >= dp(8)) {
                         pushUndo();
-                        items.add(Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],Color.YELLOW,Math.max(4f,strokeDp)));
+                        items.add(Annotation.shape(AnnotationMode.JUMPER,a[0],a[1],b[0],b[1],currentColor,Math.max(4f,strokeDp)));
                     }
                     drawing=false; invalidate(); return true;
                 }
