@@ -723,6 +723,7 @@ public class MainActivity extends AppCompatActivity {
         Button duplicate = makeButton("⧉\nDuplikat");
         Button edit = makeButton("✎\nEdit");
         Button clear = makeButton("✕\nHapus");
+        Button layer = makeButton("☷\nLayer");
         Button save = makeButton("💾\nSimpan");
         Button share = makeButton("↗\nShare");
 
@@ -731,7 +732,7 @@ public class MainActivity extends AppCompatActivity {
             b.setTextSize(10);
             toolRow1.addView(b, new LinearLayout.LayoutParams(dp(72), dp(38)));
         }
-        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear};
+        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear, layer};
         for (Button b : row2) {
             b.setTextSize(10);
             toolRow2.addView(b, new LinearLayout.LayoutParams(dp(72), dp(30)));
@@ -776,7 +777,7 @@ public class MainActivity extends AppCompatActivity {
         optionRow.setVisibility(View.GONE);
 
         rowScroll1.addView(toolRow1, new HorizontalScrollView.LayoutParams(dp(504), dp(38)));
-        rowScroll2.addView(toolRow2, new HorizontalScrollView.LayoutParams(dp(576), dp(30)));
+        rowScroll2.addView(toolRow2, new HorizontalScrollView.LayoutParams(dp(648), dp(30)));
         rowScroll3.addView(toolRow3, new HorizontalScrollView.LayoutParams(dp(576), dp(30)));
 
         annotationBar.addView(rowScroll1, new LinearLayout.LayoutParams(-1, dp(38)));
@@ -821,6 +822,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         clear.setOnClickListener(v -> { if (annotationView.deleteSelected()) status.setText("Objek terpilih dihapus"); else { annotationView.clearAll(); status.setText("Semua anotasi dihapus"); } });
+        layer.setOnClickListener(v -> showLayerDialog());
         save.setOnClickListener(v -> saveAnnotatedFreeze());
         share.setOnClickListener(v -> shareAnnotatedFreeze());
 
@@ -942,6 +944,26 @@ public class MainActivity extends AppCompatActivity {
                         status.setText("Hasil OCR disalin");
                     }
                 })
+                .show();
+    }
+
+    private void showLayerDialog() {
+        if (annotationView == null) return;
+        final String[] labels = annotationView.getLayerLabels();
+        if (labels.length == 0) { status.setText("Belum ada objek anotasi"); return; }
+        new AlertDialog.Builder(this)
+                .setTitle("Layer Objek • V3.10.6")
+                .setSingleChoiceItems(labels, annotationView.getSelectedIndex(), (dialog, which) -> {
+                    annotationView.selectIndex(which);
+                    status.setText("Layer dipilih: " + labels[which]);
+                })
+                .setPositiveButton("↑ Ke Depan", (dialog, which) -> {
+                    if (annotationView.bringSelectedToFront()) status.setText("Objek dibawa ke depan");
+                })
+                .setNegativeButton("↓ Ke Belakang", (dialog, which) -> {
+                    if (annotationView.sendSelectedToBack()) status.setText("Objek dikirim ke belakang");
+                })
+                .setNeutralButton("Tutup", null)
                 .show();
     }
 
@@ -1436,6 +1458,52 @@ public class MainActivity extends AppCompatActivity {
         }
         boolean hasSelectedText(){ return selected!=null && selected.type==AnnotationMode.TEXT; }
         Annotation getSelectedText(){ return selected; }
+
+        int getSelectedIndex() { return selected == null ? -1 : items.indexOf(selected); }
+
+        String[] getLayerLabels() {
+            String[] out = new String[items.size()];
+            for (int i = 0; i < items.size(); i++) {
+                Annotation a = items.get(i);
+                String label = annotationTypeLabel(a);
+                String extra = (a.type == AnnotationMode.TEXT && a.text != null && !a.text.trim().isEmpty()) ? " • " + a.text : "";
+                out[i] = String.format(java.util.Locale.US, "%02d • %s%s", i + 1, label, extra);
+            }
+            return out;
+        }
+
+        boolean selectIndex(int index) {
+            if (index < 0 || index >= items.size()) return false;
+            selected = items.get(index);
+            mode = AnnotationMode.SELECT;
+            invalidate();
+            return true;
+        }
+
+        boolean bringSelectedToFront() {
+            if (selected == null) return false;
+            int idx = items.indexOf(selected);
+            if (idx < 0) return false;
+            if (idx == items.size() - 1) { invalidate(); return true; }
+            pushUndo();
+            items.remove(idx);
+            items.add(selected);
+            invalidate();
+            return true;
+        }
+
+        boolean sendSelectedToBack() {
+            if (selected == null) return false;
+            int idx = items.indexOf(selected);
+            if (idx < 0) return false;
+            if (idx == 0) { invalidate(); return true; }
+            pushUndo();
+            items.remove(idx);
+            items.add(0, selected);
+            invalidate();
+            return true;
+        }
+
         void changeSelectedText(String value){ if(hasSelectedText()){ pushUndo(); selected.text=value; invalidate(); } }
 
         // Android's 90° rotation used by rotateFrozenImage maps an old source
@@ -1960,7 +2028,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         private float[] snapJumperPoint(float sx, float sy, Annotation ignore) {
-            float threshold = dp(24) / Math.max(0.25f, frozenScale);
+            float threshold = dp(24) / Math.max(0.25f, frozenMatrix.mapRadius(1f));
             float best = threshold * threshold;
             float bx = sx, by = sy; boolean found = false;
             for (Annotation o : items) {
