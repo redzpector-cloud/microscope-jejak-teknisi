@@ -762,19 +762,16 @@ public class MainActivity extends AppCompatActivity {
             toolRow3.addView(b, new LinearLayout.LayoutParams(dp(72), dp(30)));
         }
 
-        Button red = makeButton("●");
-        Button yellow = makeButton("●");
-        Button green = makeButton("●");
-        Button blue = makeButton("●");
-        Button small = makeButton("S");
-        Button medium = makeButton("M");
-        Button large = makeButton("L");
-        TextView legend = makeInfoText("Warna / Ukuran • Pilih objek untuk mengubah");
-        legend.setTextSize(10);
-
-        Button[] opts = {red, yellow, green, blue, small, medium, large};
-        optionRow.addView(legend, new LinearLayout.LayoutParams(0, dp(22), 1.55f));
-        for (Button b : opts) optionRow.addView(b, new LinearLayout.LayoutParams(0, dp(22), .55f));
+        TextView legend = makeInfoText("OBJEK • Warna / Ukuran / Rotasi");
+        legend.setTextSize(9);
+        Button red = makeButton("●R"); Button yellow = makeButton("●K");
+        Button green = makeButton("●H"); Button blue = makeButton("●B");
+        Button small = makeButton("S"); Button medium = makeButton("M"); Button large = makeButton("L");
+        Button rotateLeft = makeButton("↶15°"); Button rotateRight = makeButton("↷15°");
+        Button duplicateObj = makeButton("⧉"); Button deleteObj = makeButton("✕");
+        Button[] opts = {red, yellow, green, blue, small, medium, large, rotateLeft, rotateRight, duplicateObj, deleteObj};
+        optionRow.addView(legend, new LinearLayout.LayoutParams(dp(155), dp(28)));
+        for (Button b : opts) { b.setTextSize(9); optionRow.addView(b, new LinearLayout.LayoutParams(dp(42), dp(28))); }
         // Keep the editor compact; color/size options appear only when needed.
         optionRow.setVisibility(View.GONE);
 
@@ -786,7 +783,7 @@ public class MainActivity extends AppCompatActivity {
         annotationBar.addView(rowScroll2, new LinearLayout.LayoutParams(-1, dp(30)));
         annotationBar.addView(rowScroll3, new LinearLayout.LayoutParams(-1, dp(30)));
         annotationBar.addView(actionRow, new LinearLayout.LayoutParams(-1, dp(32)));
-        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
+        annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(28)));
 
         pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
         pen.setOnClickListener(v -> setAnnotationMode(AnnotationMode.PEN, "Pen aktif • gambar bebas pada PCB"));
@@ -835,8 +832,12 @@ public class MainActivity extends AppCompatActivity {
         small.setOnClickListener(v -> { annotationView.setSize(3); status.setText("Ukuran kecil"); });
         medium.setOnClickListener(v -> { annotationView.setSize(5); status.setText("Ukuran sedang"); });
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
+        rotateLeft.setOnClickListener(v -> { if (annotationView.rotateSelectedBy(-15f)) status.setText("Rotasi -15°"); else status.setText("Pilih objek dulu"); });
+        rotateRight.setOnClickListener(v -> { if (annotationView.rotateSelectedBy(15f)) status.setText("Rotasi +15°"); else status.setText("Pilih objek dulu"); });
+        duplicateObj.setOnClickListener(v -> { if (annotationView.duplicateSelected()) status.setText("Objek diduplikat"); else status.setText("Pilih objek dulu"); });
+        deleteObj.setOnClickListener(v -> { if (annotationView.deleteSelected()) status.setText("Objek terpilih dihapus"); else status.setText("Pilih objek dulu"); });
 
-        // Color/size controls are contextual so the PCB preview stays large.
+        // Color/size/rotation controls are contextual so the PCB preview stays large.
         pen.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.PEN, "Pen aktif • gambar bebas pada PCB"); });
         arrow.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.ARROW, "Panah aktif • tarik dari awal ke akhir"); });
         circle.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.CIRCLE, "Lingkaran aktif • tarik mengelilingi komponen"); });
@@ -1419,7 +1420,16 @@ public class MainActivity extends AppCompatActivity {
         boolean duplicateSelected() {
             if (selected==null) return false;
             pushUndo(); Annotation c=selected.copy(); float dx=dp(18)/Math.max(0.35f,frozenMatrix.mapRadius(1f));
-            c.x1+=dx; c.y1+=dx; c.x2+=dx; c.y2+=dx; items.add(c); selected=c; invalidate(); return true;
+            c.x1+=dx; c.y1+=dx; c.x2+=dx; c.y2+=dx;
+            if (c.points != null) for (PointF pt : c.points) { pt.x += dx; pt.y += dx; }
+            items.add(c); selected=c; invalidate(); return true;
+        }
+        boolean rotateSelectedBy(float degrees) {
+            if (selected == null) return false;
+            pushUndo();
+            selected.rotation += degrees;
+            invalidate();
+            return true;
         }
         boolean hasSelectedText(){ return selected!=null && selected.type==AnnotationMode.TEXT; }
         Annotation getSelectedText(){ return selected; }
