@@ -1634,8 +1634,10 @@ public class MainActivity extends AppCompatActivity {
                 Paint ep=new Paint(Paint.ANTI_ALIAS_FLAG);
                 ep.setStyle(Paint.Style.FILL); ep.setTypeface(Typeface.DEFAULT_BOLD); ep.setTextSize(dp(11));
                 ep.setColor(Color.BLACK);
-                canvas.drawCircle(av[0],av[1],dp(15),ep); canvas.drawCircle(bv[0],bv[1],dp(15),ep);
-                ep.setColor(Color.WHITE);
+                canvas.drawCircle(av[0],av[1],dp(18),ep); canvas.drawCircle(bv[0],bv[1],dp(18),ep);
+                ep.setStyle(Paint.Style.STROKE); ep.setStrokeWidth(dp(3)); ep.setColor(Color.YELLOW);
+                canvas.drawCircle(av[0],av[1],dp(17),ep); canvas.drawCircle(bv[0],bv[1],dp(17),ep);
+                ep.setStyle(Paint.Style.FILL); ep.setColor(Color.WHITE);
                 canvas.drawText("A",av[0]-dp(4),av[1]+dp(4),ep);
                 canvas.drawText("B",bv[0]-dp(4),bv[1]+dp(4),ep);
             }
@@ -1927,6 +1929,33 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
 
+        private int hitJumperEndpointHandle(float x, float y, Annotation a) {
+            if (a == null || a.type != AnnotationMode.JUMPER) return 0;
+            float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+            double rad=Math.toRadians(a.rotation), cs=Math.cos(rad), sn=Math.sin(rad);
+            float ax=(float)(cx+(a.x1-cx)*cs-(a.y1-cy)*sn);
+            float ay=(float)(cy+(a.x1-cx)*sn+(a.y1-cy)*cs);
+            float bx=(float)(cx+(a.x2-cx)*cs-(a.y2-cy)*sn);
+            float by=(float)(cy+(a.x2-cx)*sn+(a.y2-cy)*cs);
+            float[] av=sourceToView(ax,ay), bv=sourceToView(bx,by);
+            float hit=dp(30);
+            if (Math.hypot(x-av[0],y-av[1])<=hit) return 11;
+            if (Math.hypot(x-bv[0],y-bv[1])<=hit) return 12;
+            return 0;
+        }
+
+        private void moveJumperEndpointFromView(Annotation a, int handle, float vx, float vy) {
+            if (a == null || a.type != AnnotationMode.JUMPER) return;
+            float[] desired=viewToSource(vx,vy);
+            float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
+            double rad=Math.toRadians(-a.rotation), cs=Math.cos(rad), sn=Math.sin(rad);
+            float dx=desired[0]-cx, dy=desired[1]-cy;
+            float lx=(float)(cx+dx*cs-dy*sn);
+            float ly=(float)(cy+dx*sn+dy*cs);
+            if (handle==11) { a.x1=lx; a.y1=ly; }
+            else if (handle==12) { a.x2=lx; a.y2=ly; }
+        }
+
         private int hitSelectionHandle(float x, float y, Annotation a) {
             float[] box=annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
@@ -2028,7 +2057,8 @@ public class MainActivity extends AppCompatActivity {
                 if (action==MotionEvent.ACTION_DOWN) {
                     // If the current object is already selected, give its handles priority.
                     if(selected!=null) {
-                        int h=hitSelectionHandle(x,y,selected);
+                        int h = hitJumperEndpointHandle(x,y,selected);
+                        if (h==0) h=hitSelectionHandle(x,y,selected);
                         if(h!=0) {
                             selectedHandle=h;
                             moveHistoryPushed=true;
@@ -2041,6 +2071,10 @@ public class MainActivity extends AppCompatActivity {
                             transformStartDistance=(float)Math.hypot(sp[0]-cp[0],sp[1]-cp[1]);
                             rotatingSelected=(h==10);
                             transformingSelected=(h!=10);
+                            if (h==11 || h==12) {
+                                transformingSelected=true;
+                                rotatingSelected=false;
+                            }
                             return true;
                         }
                     }
@@ -2058,7 +2092,9 @@ public class MainActivity extends AppCompatActivity {
                     float[] cur=viewToSource(x,y);
                     float[] box=annotationViewBounds(transformStart);
                     float[] csrc=viewToSource((box[0]+box[2])/2f,(box[1]+box[3])/2f);
-                    if(selectedHandle==10) {
+                    if (selectedHandle==11 || selectedHandle==12) {
+                        moveJumperEndpointFromView(selected, selectedHandle, x, y);
+                    } else if(selectedHandle==10) {
                         float ang=(float)Math.toDegrees(Math.atan2(cur[1]-csrc[1],cur[0]-csrc[0]));
                         selected.rotation=transformStart.rotation+(ang-transformStartAngle);
                     } else {
