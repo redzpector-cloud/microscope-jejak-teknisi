@@ -329,7 +329,7 @@ public class MainActivity extends AppCompatActivity {
         detailRow.setOrientation(LinearLayout.HORIZONTAL);
         detailRow.setGravity(Gravity.CENTER_VERTICAL);
         detailRow.setPadding(dp(8), 0, dp(8), 0);
-        detailText = makeInfoText(detailOn ? "Ultra Detail 65%" : "Detail normal 35%");
+        detailText = makeInfoText(detailOn ? "Ultra Detail" : "Detail normal");
         detailRow.addView(detailText, new LinearLayout.LayoutParams(dp(88), dp(38)));
         detailBar = new SeekBar(this);
         detailBar.setMax(100);
@@ -425,6 +425,9 @@ public class MainActivity extends AppCompatActivity {
             @Override public boolean onScale(ScaleGestureDetector detector) {
                 if (!frozen) return false;
                 frozenZoom = Math.max(1f, Math.min(8f, frozenZoom * detector.getScaleFactor()));
+                if (zoomBar != null) {
+                    zoomBar.setProgress((int)(((frozenZoom - 1f) / 7f) * 100f));
+                }
                 updateFrozenImage();
                 return true;
             }
@@ -445,9 +448,11 @@ public class MainActivity extends AppCompatActivity {
                 float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
                 float newZoom = Math.max(1f, Math.min(max, current * factor));
                 camera.getCameraControl().setZoomRatio(newZoom);
+                lastLiveZoom = newZoom;
                 if (zoomBar != null && max > 1f) {
                     zoomBar.setProgress((int)(((newZoom - 1f) / (max - 1f)) * 100f));
                 }
+                showLivePanelTemporarily();
                 updateZoomText();
                 return true;
             }
@@ -479,7 +484,7 @@ public class MainActivity extends AppCompatActivity {
 
         detailBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                detailText.setText(progress >= 50 ? "Ultra Detail " + progress + "%" : "Detail normal " + progress + "%");
+                detailText.setText(progress >= 50 ? "Ultra Detail" : "Detail normal");
                 if (fromUser) {
                     boolean requested = progress >= 50;
                     if (requested != detailOn) {
@@ -1063,7 +1068,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.4");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.5");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1074,15 +1079,8 @@ public class MainActivity extends AppCompatActivity {
 
         CropInfo crop = getCurrentCropInfo();
         if (crop == null) return result;
-        // Flatten the current frozen view and every editor object into one bitmap.
-        // The same flattened bitmap is used by both Simpan and Share so the result
-        // is identical and includes arrows, points, lines, circles, rectangles,
-        // highlights, jumper, text and OCR objects that are inside the exported view.
-        int saveCount = canvas.save();
-        canvas.clipRect(0, 0, result.getWidth(), result.getHeight());
         annotationView.drawAnnotationsToCrop(canvas, crop.left, crop.top, crop.width, crop.height,
                 result.getWidth(), result.getHeight());
-        canvas.restoreToCount(saveCount);
         return result;
     }
 
@@ -1167,7 +1165,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/jpeg");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.4"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.5"));
     }
 
     private class OverlayView extends View {
