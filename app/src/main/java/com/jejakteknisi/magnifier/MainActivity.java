@@ -769,7 +769,7 @@ public class MainActivity extends AppCompatActivity {
         Button small = makeButton("S");
         Button medium = makeButton("M");
         Button large = makeButton("L");
-        TextView legend = makeInfoText("Warna / Ukuran • 2 jari = putar");
+        TextView legend = makeInfoText("Warna / Ukuran • Pilih objek untuk mengubah");
         legend.setTextSize(10);
 
         Button[] opts = {red, yellow, green, blue, small, medium, large};
@@ -845,7 +845,7 @@ public class MainActivity extends AppCompatActivity {
         highlight.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.HIGHLIGHT, "Highlight aktif • tarik garis untuk menyorot jalur/komponen"); });
         jumper.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.JUMPER, "Jumper aktif • tap pad awal lalu tap pad tujuan • 2 jari untuk zoom"); });
         text.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.TEXT, "Teks aktif • tap lokasi untuk menulis catatan"); });
-        select.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • geser untuk pindah • tarik handle untuk ubah ukuran • 2 jari untuk putar"); });
+        select.setOnClickListener(v -> { optionRow.setVisibility(View.VISIBLE); setAnnotationMode(AnnotationMode.SELECT, "Pilih aktif • tap objek • geser, tarik handle, atau putar dengan 2 jari"); });
         pan.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"); });
         ocr.setOnClickListener(v -> { optionRow.setVisibility(View.GONE); detectOcrOnFrozenImage(); });
 
