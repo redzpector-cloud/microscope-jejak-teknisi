@@ -1,6 +1,6 @@
 # Jejak Teknisi Microscope V3.8.9
 
-- Baseline V3.8.8 dipertahankan.
+- Baseline V3.9.1 dipertahankan.
 - Tambah quick double-tap zoom pada kamera LIVE: toggle 1× / 2×.
 - Tambah quick double-tap zoom pada Freeze: toggle 1× / 2× dan reset posisi pan.
 - Pinch zoom dan slider zoom tetap bekerja.
