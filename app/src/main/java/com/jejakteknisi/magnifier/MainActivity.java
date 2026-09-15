@@ -1350,6 +1350,7 @@ public class MainActivity extends AppCompatActivity {
         private float transformStartAngle = 0f;
         private float transformStartDistance = 1f;
         private float lastTransformDistance = 0f;
+        private float transformDownX = 0f, transformDownY = 0f;
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> undoStack = new java.util.ArrayDeque<>();
         private final java.util.ArrayDeque<java.util.ArrayList<Annotation>> redoStack = new java.util.ArrayDeque<>();
         private ScaleGestureDetector jumperScaleDetector;
@@ -1564,6 +1565,13 @@ public class MainActivity extends AppCompatActivity {
                 case JUMPER: return "Jumper";
                 default: return "Objek";
             }
+        }
+
+        private float normalizeRotation(float angle) {
+            float r = angle % 360f;
+            if (r > 180f) r -= 360f;
+            if (r < -180f) r += 360f;
+            return r;
         }
 
         private void drawSelectionOverlay(Canvas canvas, Annotation a) {
@@ -1885,11 +1893,11 @@ public class MainActivity extends AppCompatActivity {
         private int hitSelectionHandle(float x, float y, Annotation a) {
             float[] box=annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
-            float hs=dp(26);
+            float hs=dp(30);
             float[][] pts={{l,t},{(l+r)/2f,t},{r,t},{r,(t+b)/2f},{r,b},{(l+r)/2f,b},{l,b},{l,(t+b)/2f}};
             for(int i=0;i<8;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return i+1;
             float rx=(l+r)/2f, ry=t-dp(28);
-            if(Math.hypot(x-rx,y-ry)<=dp(30)) return 10;
+            if(Math.hypot(x-rx,y-ry)<=dp(34)) return 10;
             return 0;
         }
 
