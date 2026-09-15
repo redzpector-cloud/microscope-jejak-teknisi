@@ -1172,19 +1172,43 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showTextInput(final float x, final float y) {
-        final android.widget.EditText input = new android.widget.EditText(this);
+        final EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint("Contoh: VCC / jalur putus");
         input.setTextColor(Color.WHITE);
         input.setHintTextColor(Color.LTGRAY);
+
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8), dp(4), dp(8), 0);
+        box.addView(input, new LinearLayout.LayoutParams(-1, dp(52)));
+
+        TextView sizeLabel = makeInfoText("Ukuran teks");
+        sizeLabel.setTextSize(12);
+        box.addView(sizeLabel, new LinearLayout.LayoutParams(-1, dp(28)));
+        final SeekBar sizeBar = new SeekBar(this);
+        sizeBar.setMax(100);
+        sizeBar.setProgress(Math.max(0, Math.min(100, Math.round((annotationView == null ? 5f : annotationView.getTextSizePreset()) * 10f))));
+        box.addView(sizeBar, new LinearLayout.LayoutParams(-1, dp(42)));
+
+        final CheckBox bold = new CheckBox(this);
+        bold.setText("Teks tebal (Bold)");
+        bold.setTextColor(Color.WHITE);
+        box.addView(bold, new LinearLayout.LayoutParams(-1, dp(40)));
+        final CheckBox background = new CheckBox(this);
+        background.setText("Latar belakang hitam");
+        background.setTextColor(Color.WHITE);
+        box.addView(background, new LinearLayout.LayoutParams(-1, dp(40)));
+
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Tambah catatan")
-                .setView(input)
+                .setTitle("Teks PRO")
+                .setView(box)
                 .setPositiveButton("Tambah", (d, which) -> {
                     String value = input.getText().toString().trim();
                     if (!value.isEmpty() && annotationView != null) {
-                        annotationView.addTextAtView(x, y, value);
-                        status.setText("Catatan ditambahkan");
+                        float textSize = 1f + sizeBar.getProgress() / 10f;
+                        annotationView.addTextAtView(x, y, value, textSize, bold.isChecked(), background.isChecked());
+                        status.setText("Teks PRO ditambahkan");
                     }
                 })
                 .setNegativeButton("Batal", null).create();
@@ -1204,16 +1228,43 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         final Annotation a = annotationView.getSelectedText();
-        final android.widget.EditText input = new android.widget.EditText(this);
+        final EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setText(a.text == null ? "" : a.text);
         input.setTextColor(Color.WHITE);
+
+        final LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8), dp(4), dp(8), 0);
+        box.addView(input, new LinearLayout.LayoutParams(-1, dp(52)));
+        TextView sizeLabel = makeInfoText("Ukuran teks");
+        sizeLabel.setTextSize(12);
+        box.addView(sizeLabel, new LinearLayout.LayoutParams(-1, dp(28)));
+        final SeekBar sizeBar = new SeekBar(this);
+        sizeBar.setMax(100);
+        sizeBar.setProgress(Math.max(0, Math.min(100, Math.round((a.size) * 10f))));
+        box.addView(sizeBar, new LinearLayout.LayoutParams(-1, dp(42)));
+        final CheckBox bold = new CheckBox(this);
+        bold.setText("Teks tebal (Bold)");
+        bold.setTextColor(Color.WHITE);
+        bold.setChecked(a.bold);
+        box.addView(bold, new LinearLayout.LayoutParams(-1, dp(40)));
+        final CheckBox background = new CheckBox(this);
+        background.setText("Latar belakang hitam");
+        background.setTextColor(Color.WHITE);
+        background.setChecked(a.textBackground);
+        box.addView(background, new LinearLayout.LayoutParams(-1, dp(40)));
+
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle("Edit teks")
-                .setView(input)
+                .setTitle("Edit Teks PRO")
+                .setView(box)
                 .setPositiveButton("Simpan", (d, which) -> {
                     String value = input.getText().toString().trim();
-                    if (!value.isEmpty()) { annotationView.changeSelectedText(value); status.setText("Teks diperbarui"); }
+                    if (!value.isEmpty()) {
+                        float textSize = 1f + sizeBar.getProgress() / 10f;
+                        annotationView.changeSelectedText(value, textSize, bold.isChecked(), background.isChecked());
+                        status.setText("Teks PRO diperbarui");
+                    }
                 })
                 .setNegativeButton("Batal", null).create();
         dialog.setOnShowListener(d -> { input.requestFocus(); input.selectAll();
@@ -1505,6 +1556,12 @@ public class MainActivity extends AppCompatActivity {
         }
 
         void changeSelectedText(String value){ if(hasSelectedText()){ pushUndo(); selected.text=value; invalidate(); } }
+        void changeSelectedText(String value, float size, boolean bold, boolean background){
+            if(hasSelectedText()){
+                pushUndo(); selected.text=value; selected.size=Math.max(1f, Math.min(11f, size)); selected.bold=bold; selected.textBackground=background; invalidate();
+            }
+        }
+        float getTextSizePreset(){ return strokeDp; }
 
         // Android's 90° rotation used by rotateFrozenImage maps an old source
         // point (x,y) to the new bitmap as (oldHeight-y, x). Preserve every
@@ -1564,8 +1621,16 @@ public class MainActivity extends AppCompatActivity {
         float[] viewToSourcePublic(float x, float y) { return viewToSource(x,y); }
 
         void addTextAtView(float x, float y, String text) {
+            addTextAtView(x, y, text, Math.max(1f, strokeDp), false, false);
+        }
+        void addTextAtView(float x, float y, String text, float size, boolean bold, boolean background) {
             float[] p=viewToSource(x,y);
-            pushUndo(); items.add(Annotation.text(p[0],p[1],text,currentColor,strokeDp));
+            pushUndo();
+            Annotation a = Annotation.text(p[0],p[1],text,currentColor,size);
+            a.bold = bold;
+            a.textBackground = background;
+            items.add(a);
+            selected = a;
             invalidate();
         }
 
@@ -1775,14 +1840,14 @@ public class MainActivity extends AppCompatActivity {
             } else if (a.type==AnnotationMode.TEXT) {
                 // Text bounds are computed in VIEW pixels so zoom does not enlarge the label.
                 Paint tp = new Paint(Paint.ANTI_ALIAS_FLAG);
-                tp.setTypeface(Typeface.DEFAULT_BOLD);
+                tp.setTypeface(a.bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
                 float textPx = dp((int)(18 + a.size));
                 tp.setTextSize(textPx / scale);
                 String txt=a.text==null?"":a.text;
                 float twSrc=tp.measureText(txt);
                 float thSrc=tp.getTextSize();
                 float[] anchor=sourceToView(a.x1,a.y1);
-                float halfPad=dp(6);
+                float halfPad=dp(a.textBackground ? 9 : 6);
                 float[] vx={anchor[0], anchor[0]+twSrc*scale, anchor[0]+twSrc*scale, anchor[0]};
                 float[] vy={anchor[1]-thSrc*scale, anchor[1]-thSrc*scale, anchor[1], anchor[1]};
                 float cxV=anchor[0], cyV=anchor[1];
@@ -1908,14 +1973,23 @@ public class MainActivity extends AppCompatActivity {
                 canvas.drawLine(a.x1,a.y1,a.x2,a.y2,paint);
                 paint.setAlpha(255);
             } else if (a.type==AnnotationMode.TEXT) {
-                // Text is anchored in SOURCE coordinates but rendered at a fixed VIEW size.
-                // This keeps labels readable while zooming/panning the frozen PCB image.
+                // Text PRO: readable at any frozen zoom, freely rotatable, optional bold/background.
                 paint.setStyle(Paint.Style.FILL);
+                paint.setTypeface(a.bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
                 paint.setTextSize(dp((int)(18 + a.size)) / scale);
+                String txt = a.text == null ? "" : a.text;
+                float pad = dp(7) / scale;
+                float tw = paint.measureText(txt);
+                float th = paint.getTextSize();
                 canvas.save();
                 canvas.rotate(a.rotation, a.x1, a.y1);
+                if (a.textBackground) {
+                    paint.setColor(Color.argb(205, 0, 0, 0));
+                    canvas.drawRoundRect(a.x1 - pad, a.y1 - th - pad, a.x1 + tw + pad, a.y1 + pad, dp(6) / scale, dp(6) / scale, paint);
+                    paint.setColor(a.color);
+                }
                 paint.setShadowLayer(dp(3) / scale, 1f / scale, 1f / scale, Color.BLACK);
-                canvas.drawText(a.text == null ? "" : a.text, a.x1, a.y1, paint);
+                canvas.drawText(txt, a.x1, a.y1, paint);
                 paint.clearShadowLayer();
                 canvas.restore();
             } else if (a.type==AnnotationMode.OCR) {
@@ -2334,13 +2408,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private static class Annotation {
-        AnnotationMode type; float x1,y1,x2,y2; String text; int color=Color.RED; float size=5f; float rotation=0f; ArrayList<PointF> points;
+        AnnotationMode type; float x1,y1,x2,y2; String text; int color=Color.RED; float size=5f; float rotation=0f; boolean bold=false; boolean textBackground=false; ArrayList<PointF> points;
         static Annotation marker(float x,float y,int c,float s){return shape(AnnotationMode.MARKER,x,y,x,y,c,s);}
         static Annotation pen(int c,float s){ Annotation a=new Annotation(); a.type=AnnotationMode.PEN; a.color=c; a.size=s; a.points=new ArrayList<>(); return a; }
         static Annotation text(float x,float y,String t,int c,float s){Annotation a=marker(x,y,c,s);a.type=AnnotationMode.TEXT;a.text=t;return a;}
         static Annotation ocr(float x1,float y1,float x2,float y2,String t,int c,float s){Annotation a=shape(AnnotationMode.OCR,x1,y1,x2,y2,c,s);a.text=t;return a;}
         static Annotation shape(AnnotationMode m,float x1,float y1,float x2,float y2,int c,float s){Annotation a=new Annotation();a.type=m;a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.color=c;a.size=s;return a;}
-        Annotation copy(){ Annotation a=new Annotation(); a.type=type; a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.text=text;a.color=color;a.size=size;a.rotation=rotation; if(points!=null){a.points=new ArrayList<>(); for(PointF p:points)a.points.add(new PointF(p.x,p.y));} return a; }
+        Annotation copy(){ Annotation a=new Annotation(); a.type=type; a.x1=x1;a.y1=y1;a.x2=x2;a.y2=y2;a.text=text;a.color=color;a.size=size;a.rotation=rotation;a.bold=bold;a.textBackground=textBackground; if(points!=null){a.points=new ArrayList<>(); for(PointF p:points)a.points.add(new PointF(p.x,p.y));} return a; }
     }
 
     private void snapBottomSheet() {
