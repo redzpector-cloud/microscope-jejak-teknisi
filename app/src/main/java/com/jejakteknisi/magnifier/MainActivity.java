@@ -1587,6 +1587,9 @@ public class MainActivity extends AppCompatActivity {
             return r;
         }
 
+        private boolean jumperSnapActive = false;
+        private float jumperSnapX = 0f, jumperSnapY = 0f;
+
         private void drawSelectionOverlay(Canvas canvas, Annotation a) {
             float[] box = annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
@@ -1623,6 +1626,15 @@ public class MainActivity extends AppCompatActivity {
             canvas.drawRoundRect(ox-dp(5), oy-dp(14), ox+ow+dp(5), oy+dp(4), dp(6), dp(6), sp);
             sp.setColor(Color.WHITE);
             canvas.drawText(objectText, ox, oy, sp);
+
+            if (a.type==AnnotationMode.JUMPER && jumperSnapActive) {
+                float[] sv = sourceToView(jumperSnapX, jumperSnapY);
+                Paint sg = new Paint(Paint.ANTI_ALIAS_FLAG);
+                sg.setStyle(Paint.Style.STROKE); sg.setStrokeWidth(dp(2)); sg.setColor(Color.CYAN);
+                canvas.drawCircle(sv[0], sv[1], dp(22), sg);
+                canvas.drawLine(sv[0]-dp(28), sv[1], sv[0]+dp(28), sv[1], sg);
+                canvas.drawLine(sv[0], sv[1]-dp(28), sv[0], sv[1]+dp(28), sg);
+            }
 
             // Jumper PRO endpoint markers: A = source pad, B = destination pad.
             // They are shown only for a selected jumper so the edit screen stays clean.
@@ -1947,16 +1959,42 @@ public class MainActivity extends AppCompatActivity {
             return 0;
         }
 
+        private float[] snapJumperPoint(float sx, float sy, Annotation ignore) {
+            float threshold = dp(24) / Math.max(0.25f, frozenScale);
+            float best = threshold * threshold;
+            float bx = sx, by = sy; boolean found = false;
+            for (Annotation o : items) {
+                if (o == null || o == ignore || o.type == AnnotationMode.PEN) continue;
+                float[][] c = {{o.x1,o.y1},{o.x2,o.y2},{o.x1,o.y2},{o.x2,o.y1}};
+                if (o.type == AnnotationMode.MARKER || o.type == AnnotationMode.TEXT) c = new float[][]{{o.x1,o.y1}};
+                for (float[] pt : c) {
+                    float dx=sx-pt[0], dy=sy-pt[1], d2=dx*dx+dy*dy;
+                    if (d2 <= best) { best=d2; bx=pt[0]; by=pt[1]; found=true; }
+                }
+            }
+            jumperSnapActive=found; jumperSnapX=bx; jumperSnapY=by;
+            return new float[]{bx,by};
+        }
+
+        private float[] rotatePoint(float x,float y,float cx,float cy,float degrees) {
+            double rad=Math.toRadians(degrees), cs=Math.cos(rad), sn=Math.sin(rad);
+            float dx=x-cx, dy=y-cy;
+            return new float[]{(float)(cx+dx*cs-dy*sn),(float)(cy+dx*sn+dy*cs)};
+        }
+
         private void moveJumperEndpointFromView(Annotation a, int handle, float vx, float vy) {
-            if (a == null || a.type != AnnotationMode.JUMPER) return;
+            if (a==null || a.type!=AnnotationMode.JUMPER) return;
             float[] desired=viewToSource(vx,vy);
             float cx=(a.x1+a.x2)/2f, cy=(a.y1+a.y2)/2f;
-            double rad=Math.toRadians(-a.rotation), cs=Math.cos(rad), sn=Math.sin(rad);
-            float dx=desired[0]-cx, dy=desired[1]-cy;
-            float lx=(float)(cx+dx*cs-dy*sn);
-            float ly=(float)(cy+dx*sn+dy*cs);
-            if (handle==11) { a.x1=lx; a.y1=ly; }
-            else if (handle==12) { a.x2=lx; a.y2=ly; }
+            float[] aw=rotatePoint(a.x1,a.y1,cx,cy,a.rotation);
+            float[] bw=rotatePoint(a.x2,a.y2,cx,cy,a.rotation);
+            if(handle==11) aw=snapJumperPoint(desired[0],desired[1],a);
+            else if(handle==12) bw=snapJumperPoint(desired[0],desired[1],a);
+            else { jumperSnapActive=false; return; }
+            float ncx=(aw[0]+bw[0])/2f, ncy=(aw[1]+bw[1])/2f;
+            float[] al=rotatePoint(aw[0],aw[1],ncx,ncy,-a.rotation);
+            float[] bl=rotatePoint(bw[0],bw[1],ncx,ncy,-a.rotation);
+            a.x1=al[0]; a.y1=al[1]; a.x2=bl[0]; a.y2=bl[1];
         }
 
         private int hitSelectionHandle(float x, float y, Annotation a) {
@@ -2125,6 +2163,7 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 }
                 if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
+                    jumperSnapActive=false;
                     // A simple tap on a text object opens the editor directly.
                     // Dragging still only moves the selected object.
                     boolean simpleTap = Math.hypot(x-lastSelectX, y-lastSelectY) < dp(12);
