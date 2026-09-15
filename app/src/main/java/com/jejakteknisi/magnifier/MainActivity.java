@@ -1561,30 +1561,33 @@ public class MainActivity extends AppCompatActivity {
             sp.setPathEffect(null);
             sp.setStyle(Paint.Style.FILL);
             sp.setColor(Color.YELLOW);
-            float hs=dp(10);
+            float hs=dp(12);
             canvas.drawCircle(l,t,hs,sp); canvas.drawCircle(r,t,hs,sp);
             canvas.drawCircle(l,b,hs,sp); canvas.drawCircle(r,b,hs,sp);
-            canvas.drawCircle((l+r)/2f,t,dp(6),sp);
-            canvas.drawCircle((l+r)/2f,b,dp(6),sp);
-            canvas.drawCircle(l,(t+b)/2f,dp(6),sp);
-            canvas.drawCircle(r,(t+b)/2f,dp(6),sp);
+            canvas.drawCircle((l+r)/2f,t,dp(7),sp);
+            canvas.drawCircle((l+r)/2f,b,dp(7),sp);
+            canvas.drawCircle(l,(t+b)/2f,dp(7),sp);
+            canvas.drawCircle(r,(t+b)/2f,dp(7),sp);
             float ry=t-dp(28);
             sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
-            sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
+            sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
 
-            // Rotation handle: show the current angle beside the handle so
-            // technicians can make repeatable, precise rotations.
-            sp.setTypeface(Typeface.DEFAULT_BOLD);
-            sp.setTextSize(dp(11));
-            String angleText = String.format(java.util.Locale.US, "%.0f°", normalizeAngle(a.rotation));
-            float tw = sp.measureText(angleText);
-            float tx = (l+r)/2f - tw/2f;
-            float ty = ry - dp(12);
-            sp.setColor(Color.WHITE);
-            canvas.drawRoundRect(tx-dp(5), ty-dp(12), tx+tw+dp(5), ty+dp(3), dp(6), dp(6), sp);
-            sp.setColor(Color.BLACK);
-            canvas.drawText(angleText, tx, ty, sp);
+            // Rotation angle is shown only while the user is actively rotating.
+            // This keeps the editor clean while still giving precise feedback.
+            if (rotatingSelected) {
+                sp.setTypeface(Typeface.DEFAULT_BOLD);
+                sp.setTextSize(dp(12));
+                String angleText = String.format(java.util.Locale.US, "Rotasi %+.0f°", normalizeAngle(a.rotation));
+                float tw = sp.measureText(angleText);
+                float tx = Math.max(dp(8), Math.min(getWidth()-tw-dp(8), (l+r)/2f-tw/2f));
+                float ty = Math.max(dp(24), ry-dp(10));
+                sp.setStyle(Paint.Style.FILL);
+                sp.setColor(Color.argb(220,0,0,0));
+                canvas.drawRoundRect(tx-dp(7), ty-dp(16), tx+tw+dp(7), ty+dp(5), dp(7), dp(7), sp);
+                sp.setColor(Color.WHITE);
+                canvas.drawText(angleText, tx, ty, sp);
+            }
         }
 
         private float normalizeAngle(float angle) {
@@ -1852,11 +1855,11 @@ public class MainActivity extends AppCompatActivity {
         private int hitSelectionHandle(float x, float y, Annotation a) {
             float[] box=annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
-            float hs=dp(22);
+            float hs=dp(26);
             float[][] pts={{l,t},{(l+r)/2f,t},{r,t},{r,(t+b)/2f},{r,b},{(l+r)/2f,b},{l,b},{l,(t+b)/2f}};
             for(int i=0;i<8;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return i+1;
             float rx=(l+r)/2f, ry=t-dp(28);
-            if(Math.hypot(x-rx,y-ry)<=dp(24)) return 10;
+            if(Math.hypot(x-rx,y-ry)<=dp(30)) return 10;
             return 0;
         }
 
