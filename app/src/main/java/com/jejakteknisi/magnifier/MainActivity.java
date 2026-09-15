@@ -1572,6 +1572,26 @@ public class MainActivity extends AppCompatActivity {
             sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
             sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
+
+            // Rotation handle: show the current angle beside the handle so
+            // technicians can make repeatable, precise rotations.
+            sp.setTypeface(Typeface.DEFAULT_BOLD);
+            sp.setTextSize(dp(11));
+            String angleText = String.format(java.util.Locale.US, "%.0f°", normalizeAngle(a.rotation));
+            float tw = sp.measureText(angleText);
+            float tx = (l+r)/2f - tw/2f;
+            float ty = ry - dp(12);
+            sp.setColor(Color.WHITE);
+            canvas.drawRoundRect(tx-dp(5), ty-dp(12), tx+tw+dp(5), ty+dp(3), dp(6), dp(6), sp);
+            sp.setColor(Color.BLACK);
+            canvas.drawText(angleText, tx, ty, sp);
+        }
+
+        private float normalizeAngle(float angle) {
+            float a = angle % 360f;
+            if (a > 180f) a -= 360f;
+            if (a < -180f) a += 360f;
+            return a;
         }
 
         /**
