@@ -103,6 +103,9 @@ public class MainActivity extends AppCompatActivity {
     private ScaleGestureDetector frozenScaleDetector;
     private ScaleGestureDetector liveScaleDetector;
     private boolean livePinching = false;
+    // Quick double-tap zoom for microscope inspection.
+    private long lastLiveTapTime = 0L;
+    private long lastFrozenTapTime = 0L;
     private float liveLastScale = 1f;
     private float liveDownX = 0f;
     private float liveDownY = 0f;
@@ -549,6 +552,21 @@ public class MainActivity extends AppCompatActivity {
                             updateFrozenImage();
                             return true;
                         case MotionEvent.ACTION_UP:
+                            long nowFrozen = System.currentTimeMillis();
+                            if (!movingFrozen && nowFrozen - lastFrozenTapTime <= 280L) {
+                                float target = frozenZoom > 1.01f ? 1f : 2f;
+                                frozenZoom = Math.max(1f, Math.min(8f, target));
+                                frozenPanX = 0f;
+                                frozenPanY = 0f;
+                                if (zoomBar != null) {
+                                    zoomBar.setProgress((int)(((frozenZoom - 1f) / 7f) * 100f));
+                                }
+                                updateFrozenImage();
+                                status.setText(frozenZoom > 1.01f ? "Freeze Zoom 2×" : "Freeze Zoom 1×");
+                                lastFrozenTapTime = 0L;
+                            } else if (!movingFrozen) {
+                                lastFrozenTapTime = nowFrozen;
+                            }
                             return true;
                     }
                 }
@@ -572,7 +590,24 @@ public class MainActivity extends AppCompatActivity {
                     return true;
                 case MotionEvent.ACTION_UP:
                     if (!livePinching && Math.hypot(event.getX() - liveDownX, event.getY() - liveDownY) <= dp(18)) {
-                        focusAt(event.getX(), event.getY());
+                        long nowLive = System.currentTimeMillis();
+                        if (nowLive - lastLiveTapTime <= 280L) {
+                            if (camera != null && camera.getCameraInfo().getZoomState().getValue() != null) {
+                                float max = camera.getCameraInfo().getZoomState().getValue().getMaxZoomRatio();
+                                float target = lastLiveZoom > 1.01f ? 1f : Math.min(2f, max);
+                                camera.getCameraControl().setZoomRatio(target);
+                                lastLiveZoom = target;
+                                if (zoomBar != null && max > 1f) {
+                                    zoomBar.setProgress((int)(((target - 1f) / (max - 1f)) * 100f));
+                                }
+                                updateZoomText();
+                                status.setText(target > 1.01f ? "LIVE Zoom 2×" : "LIVE Zoom 1×");
+                            }
+                            lastLiveTapTime = 0L;
+                        } else {
+                            focusAt(event.getX(), event.getY());
+                            lastLiveTapTime = nowLive;
+                        }
                     }
                     livePinching = false;
                     return true;
@@ -1076,7 +1111,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.8");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.9");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1173,7 +1208,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/png");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.8"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.9"));
     }
 
     private class OverlayView extends View {
