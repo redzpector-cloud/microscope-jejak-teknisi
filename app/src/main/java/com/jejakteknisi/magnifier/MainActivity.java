@@ -1063,7 +1063,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.3");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.4");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1074,8 +1074,15 @@ public class MainActivity extends AppCompatActivity {
 
         CropInfo crop = getCurrentCropInfo();
         if (crop == null) return result;
+        // Flatten the current frozen view and every editor object into one bitmap.
+        // The same flattened bitmap is used by both Simpan and Share so the result
+        // is identical and includes arrows, points, lines, circles, rectangles,
+        // highlights, jumper, text and OCR objects that are inside the exported view.
+        int saveCount = canvas.save();
+        canvas.clipRect(0, 0, result.getWidth(), result.getHeight());
         annotationView.drawAnnotationsToCrop(canvas, crop.left, crop.top, crop.width, crop.height,
                 result.getWidth(), result.getHeight());
+        canvas.restoreToCount(saveCount);
         return result;
     }
 
@@ -1160,7 +1167,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/jpeg");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.3"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.4"));
     }
 
     private class OverlayView extends View {
