@@ -834,6 +834,9 @@ public class MainActivity extends AppCompatActivity {
         large.setOnClickListener(v -> { annotationView.setSize(8); status.setText("Ukuran besar"); });
         rotateLeft.setOnClickListener(v -> { if (annotationView.rotateSelectedBy(-15f)) status.setText("Rotasi -15°"); else status.setText("Pilih objek dulu"); });
         rotateRight.setOnClickListener(v -> { if (annotationView.rotateSelectedBy(15f)) status.setText("Rotasi +15°"); else status.setText("Pilih objek dulu"); });
+        // Long-press gives precision rotation without adding more buttons to the compact row.
+        rotateLeft.setOnLongClickListener(v -> { if (annotationView.rotateSelectedBy(-1f)) status.setText("Rotasi -1°"); else status.setText("Pilih objek dulu"); return true; });
+        rotateRight.setOnLongClickListener(v -> { if (annotationView.rotateSelectedBy(1f)) status.setText("Rotasi +1°"); else status.setText("Pilih objek dulu"); return true; });
         duplicateObj.setOnClickListener(v -> { if (annotationView.duplicateSelected()) status.setText("Objek diduplikat"); else status.setText("Pilih objek dulu"); });
         deleteObj.setOnClickListener(v -> { if (annotationView.deleteSelected()) status.setText("Objek terpilih dihapus"); else status.setText("Pilih objek dulu"); });
 
