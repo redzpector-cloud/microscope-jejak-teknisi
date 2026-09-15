@@ -691,11 +691,22 @@ public class MainActivity extends AppCompatActivity {
             b.setTextSize(10);
             toolRow1.addView(b, new LinearLayout.LayoutParams(dp(72), dp(38)));
         }
-        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear, save, share};
+        Button[] row2 = {ocr, undo, redo, duplicate, edit, clear};
         for (Button b : row2) {
             b.setTextSize(10);
             toolRow2.addView(b, new LinearLayout.LayoutParams(dp(72), dp(30)));
         }
+
+        // Simpan dan Share dibuat fixed (tidak ikut horizontal scroll)
+        // agar selalu terlihat di layar saat editor digunakan.
+        LinearLayout actionRow = new LinearLayout(this);
+        actionRow.setOrientation(LinearLayout.HORIZONTAL);
+        actionRow.setGravity(Gravity.CENTER);
+        actionRow.setPadding(dp(2), 0, dp(2), 0);
+        save.setTextSize(10);
+        share.setTextSize(10);
+        actionRow.addView(save, new LinearLayout.LayoutParams(0, dp(32), 1));
+        actionRow.addView(share, new LinearLayout.LayoutParams(0, dp(32), 1));
 
         Button line = makeButton("╱\nGaris");
         Button rect = makeButton("□\nKotak");
@@ -734,6 +745,7 @@ public class MainActivity extends AppCompatActivity {
         annotationBar.addView(rowScroll1, new LinearLayout.LayoutParams(-1, dp(38)));
         annotationBar.addView(rowScroll2, new LinearLayout.LayoutParams(-1, dp(30)));
         annotationBar.addView(rowScroll3, new LinearLayout.LayoutParams(-1, dp(30)));
+        annotationBar.addView(actionRow, new LinearLayout.LayoutParams(-1, dp(32)));
         annotationBar.addView(optionRow, new LinearLayout.LayoutParams(-1, dp(22)));
 
         pan.setOnClickListener(v -> setAnnotationMode(AnnotationMode.NONE, "Geser aktif • gunakan 1 jari untuk pan / 2 jari untuk zoom"));
@@ -1051,7 +1063,7 @@ public class MainActivity extends AppCompatActivity {
             status.setText("Gagal menyiapkan gambar");
             return;
         }
-        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.6");
+        if (saveBitmapToGallery(result) != null) status.setText("💾 Hasil inspeksi tersimpan • V3.8.3");
     }
 
     private Bitmap buildAnnotatedBitmap() {
@@ -1148,7 +1160,7 @@ public class MainActivity extends AppCompatActivity {
         intent.setType("image/jpeg");
         intent.putExtra(Intent.EXTRA_STREAM, uri);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB"));
+        startActivity(Intent.createChooser(intent, "Bagikan hasil inspeksi PCB • V3.8.3"));
     }
 
     private class OverlayView extends View {
