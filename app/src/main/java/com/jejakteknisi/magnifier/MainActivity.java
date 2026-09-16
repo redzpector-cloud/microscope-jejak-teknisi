@@ -2150,12 +2150,12 @@ public class MainActivity extends AppCompatActivity {
             // The Select UI displays only four corner handles. Keep the touch
             // map consistent with what is visible; invisible side handles made
             // the object feel as if it resized from an empty area.
-            float hs=dp(30);
+            float hs=dp(24);
             float[][] pts={{l,t},{r,t},{r,b},{l,b}};
             int[] handleIds={1,3,5,7};
             for(int i=0;i<pts.length;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return handleIds[i];
             float rx=(l+r)/2f, ry=t-dp(28);
-            if(Math.hypot(x-rx,y-ry)<=dp(34)) return 10;
+            if(Math.hypot(x-rx,y-ry)<=dp(22)) return 10;
             return 0;
         }
 
