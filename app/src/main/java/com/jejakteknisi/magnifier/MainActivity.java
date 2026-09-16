@@ -1737,15 +1737,15 @@ public class MainActivity extends AppCompatActivity {
             // Minimal selection frame: thin cyan line and four corner handles.
             // The touch hit areas remain larger in hitSelectionHandle(), so the
             // UI stays clean without making small PCB objects difficult to edit.
-            sp.setStrokeWidth(dp(3));
-            sp.setColor(Color.argb(150,0,0,0));
+            sp.setStrokeWidth(dp(2));
+            sp.setColor(Color.argb(130,0,0,0));
             sp.setPathEffect(null);
             canvas.drawRect(l,t,r,b,sp);
-            sp.setStrokeWidth(dp(1));
+            sp.setStrokeWidth(dp(2));
             sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawRect(l,t,r,b,sp);
 
-            float hs=dp(5);
+            float hs=dp(4);
             float[][] corners={{l,t},{r,t},{l,b},{r,b}};
             sp.setStyle(Paint.Style.FILL);
             sp.setColor(Color.WHITE);
@@ -1761,22 +1761,9 @@ public class MainActivity extends AppCompatActivity {
             sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
             sp.setStyle(Paint.Style.FILL); sp.setColor(Color.WHITE);
-            canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
+            canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
             sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.rgb(0, 220, 255));
-            canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
-
-            // Small object badge makes the current selection obvious on a phone.
-            sp.setTypeface(Typeface.DEFAULT_BOLD);
-            sp.setTextSize(dp(11));
-            String objectText = annotationTypeLabel(a);
-            float ow = sp.measureText(objectText);
-            float ox = Math.max(dp(8), Math.min(getWidth()-ow-dp(8), l));
-            float oy = Math.max(dp(18), t-dp(36));
-            sp.setStyle(Paint.Style.FILL);
-            sp.setColor(Color.argb(205,0,0,0));
-            canvas.drawRoundRect(ox-dp(5), oy-dp(14), ox+ow+dp(5), oy+dp(4), dp(6), dp(6), sp);
-            sp.setColor(Color.WHITE);
-            canvas.drawText(objectText, ox, oy, sp);
+            canvas.drawCircle((l+r)/2f,ry,dp(7),sp);
 
             if (a.type==AnnotationMode.JUMPER && jumperSnapActive) {
                 float[] sv = sourceToView(jumperSnapX, jumperSnapY);

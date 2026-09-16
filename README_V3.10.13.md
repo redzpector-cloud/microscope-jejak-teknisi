@@ -1,4 +1,4 @@
-# Jejak Teknisi Microscope V3.10.13
+# Jejak Teknisi Microscope V3.10.14
 
 - Penyederhanaan UI Select/Pilih.
 - Seleksi memakai frame cyan tipis.
@@ -7,4 +7,4 @@
 - Handle rotasi tetap tersedia.
 - Tidak mengubah objek, Layer, Undo/Redo, Save/Share.
 - versionCode: 3113
-- versionName: 3.10.13
+- versionName: 3.10.14
