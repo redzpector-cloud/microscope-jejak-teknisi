@@ -1727,25 +1727,38 @@ public class MainActivity extends AppCompatActivity {
             float[] box = annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
             Paint sp = new Paint(Paint.ANTI_ALIAS_FLAG);
+            // Clean selection UI: solid cyan outline instead of a distracting
+            // white dashed box with yellow handles. The cyan treatment is
+            // easier to follow over PCB/camera imagery and is consistent
+            // for every selected object.
             sp.setStyle(Paint.Style.STROKE);
             sp.setStrokeWidth(dp(2));
-            sp.setColor(Color.WHITE);
-            sp.setPathEffect(new android.graphics.DashPathEffect(new float[]{dp(6),dp(4)},0));
-            canvas.drawRect(l,t,r,b,sp);
+            sp.setColor(Color.rgb(0, 220, 255));
             sp.setPathEffect(null);
+            canvas.drawRect(l,t,r,b,sp);
+
+            // Small white handles with a cyan outline are easier to grab and
+            // don't visually overpower the object being edited.
+            float hs=dp(9);
+            int[] hx = {(int)l,(int)r,(int)l,(int)r,(int)((l+r)/2f),(int)((l+r)/2f),(int)l,(int)r};
+            int[] hy = {(int)t,(int)t,(int)b,(int)b,(int)t,(int)b,(int)((t+b)/2f),(int)((t+b)/2f)};
             sp.setStyle(Paint.Style.FILL);
-            sp.setColor(Color.YELLOW);
-            float hs=dp(12);
-            canvas.drawCircle(l,t,hs,sp); canvas.drawCircle(r,t,hs,sp);
-            canvas.drawCircle(l,b,hs,sp); canvas.drawCircle(r,b,hs,sp);
-            canvas.drawCircle((l+r)/2f,t,dp(7),sp);
-            canvas.drawCircle((l+r)/2f,b,dp(7),sp);
-            canvas.drawCircle(l,(t+b)/2f,dp(7),sp);
-            canvas.drawCircle(r,(t+b)/2f,dp(7),sp);
+            sp.setColor(Color.WHITE);
+            for (int i=0;i<hx.length;i++) canvas.drawCircle(hx[i],hy[i],hs,sp);
+            sp.setStyle(Paint.Style.STROKE);
+            sp.setStrokeWidth(dp(2));
+            sp.setColor(Color.rgb(0, 220, 255));
+            for (int i=0;i<hx.length;i++) canvas.drawCircle(hx[i],hy[i],hs,sp);
+
+            // Rotation handle: cyan ring + white center.
             float ry=t-dp(28);
-            sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.YELLOW);
+            sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2));
+            sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawLine((l+r)/2f,t,(l+r)/2f,ry+dp(6),sp);
-            sp.setStyle(Paint.Style.FILL); canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
+            sp.setStyle(Paint.Style.FILL); sp.setColor(Color.WHITE);
+            canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
+            sp.setStyle(Paint.Style.STROKE); sp.setStrokeWidth(dp(2)); sp.setColor(Color.rgb(0, 220, 255));
+            canvas.drawCircle((l+r)/2f,ry,dp(9),sp);
 
             // Small object badge makes the current selection obvious on a phone.
             sp.setTypeface(Typeface.DEFAULT_BOLD);
