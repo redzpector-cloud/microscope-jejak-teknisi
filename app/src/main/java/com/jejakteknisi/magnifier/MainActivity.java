@@ -3235,6 +3235,115 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void showGradeTableImage() {
+        final AlertDialog dialog = new AlertDialog.Builder(this).create();
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(8), dp(8), dp(8), dp(8));
+        root.setBackgroundColor(Color.rgb(5, 14, 22));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(this);
+        title.setText("📊 TABEL GRADE eMMC");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(18);
+        title.setTypeface(null, Typeface.BOLD);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(44), 1));
+        Button close = makeButton("✕");
+        close.setTextSize(16);
+        header.addView(close, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        root.addView(header);
+
+        TextView info = new TextView(this);
+        info.setText("Cubit gambar untuk memperbesar • Cubit kembali untuk mengecilkan");
+        info.setTextColor(Color.LTGRAY);
+        info.setTextSize(11);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(0, 0, 0, dp(6));
+        root.addView(info);
+
+        ImageView image = new ImageView(this);
+        image.setImageResource(com.jejakteknisi.magnifier.R.drawable.tabel_grade_emmc);
+        image.setScaleType(ImageView.ScaleType.MATRIX);
+        root.addView(image, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        final Matrix matrix = new Matrix();
+        final float[] values = new float[9];
+        final float[] last = new float[2];
+        final boolean[] dragging = {false};
+        final ScaleGestureDetector[] scaleDetector = new ScaleGestureDetector[1];
+        final float[] minScale = {1f};
+
+        image.post(() -> {
+            Bitmap b = BitmapFactory.decodeResource(getResources(), R.drawable.tabel_grade_emmc);
+            if (b == null || image.getWidth() <= 0 || image.getHeight() <= 0) return;
+            float fit = Math.min((float) image.getWidth() / b.getWidth(), (float) image.getHeight() / b.getHeight());
+            minScale[0] = fit;
+            matrix.setScale(fit, fit);
+            float dx = (image.getWidth() - b.getWidth() * fit) / 2f;
+            float dy = (image.getHeight() - b.getHeight() * fit) / 2f;
+            matrix.postTranslate(dx, dy);
+            image.setImageMatrix(matrix);
+        });
+
+        scaleDetector[0] = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            @Override public boolean onScale(ScaleGestureDetector detector) {
+                float factor = detector.getScaleFactor();
+                matrix.postScale(factor, factor, detector.getFocusX(), detector.getFocusY());
+                matrix.getValues(values);
+                float current = values[Matrix.MSCALE_X];
+                float min = minScale[0];
+                if (current < min) {
+                    float fix = min / Math.max(0.01f, current);
+                    matrix.postScale(fix, fix, detector.getFocusX(), detector.getFocusY());
+                } else if (current > min * 5f) {
+                    float fix = (min * 5f) / current;
+                    matrix.postScale(fix, fix, detector.getFocusX(), detector.getFocusY());
+                }
+                image.setImageMatrix(matrix);
+                return true;
+            }
+        });
+
+        image.setOnTouchListener((v, event) -> {
+            scaleDetector[0].onTouchEvent(event);
+            if (event.getPointerCount() == 1) {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN) {
+                    last[0] = event.getX(); last[1] = event.getY(); dragging[0] = true;
+                } else if (event.getActionMasked() == MotionEvent.ACTION_MOVE && dragging[0]) {
+                    matrix.postTranslate(event.getX() - last[0], event.getY() - last[1]);
+                    last[0] = event.getX(); last[1] = event.getY();
+                    image.setImageMatrix(matrix);
+                } else if (event.getActionMasked() == MotionEvent.ACTION_UP || event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    dragging[0] = false;
+                }
+            } else {
+                dragging[0] = false;
+            }
+            return true;
+        });
+
+        close.setOnClickListener(v -> dialog.dismiss());
+        dialog.setView(root);
+        dialog.setOnShowListener(d -> {
+            android.view.Window w = dialog.getWindow();
+            if (w != null) {
+                w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+                w.setDimAmount(0.85f);
+                w.setLayout(-1, -1);
+            }
+        });
+        dialog.show();
+        android.view.Window w = dialog.getWindow();
+        if (w != null) {
+            w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            w.setDimAmount(0.85f);
+            w.setLayout(-1, -1);
+        }
+    }
+
     private void showEmmcDatabase() {
         if (emmcDialog != null && emmcDialog.isShowing()) return;
 
@@ -3303,18 +3412,17 @@ public class MainActivity extends AppCompatActivity {
         quickRow.addView(learnBtn, lp2);
         panel.addView(quickRow, qr);
 
+        Button gradeTableBtn = makeButton("📊  TABEL GRADE eMMC");
+        gradeTableBtn.setTextSize(13);
+        LinearLayout.LayoutParams gp = new LinearLayout.LayoutParams(-1, dp(44));
+        gp.setMargins(0, 0, 0, dp(4));
+        panel.addView(gradeTableBtn, gp);
+
         Button addBtn = makeButton("＋  Tambah Data");
         addBtn.setTextSize(13);
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(44));
         ap.setMargins(0, 0, 0, dp(4));
         panel.addView(addBtn, ap);
-
-        TextView hint = new TextView(this);
-        hint.setText("Kamera otomatis fokus ke area tulisan eMMC");
-        hint.setTextColor(Color.rgb(145, 180, 195));
-        hint.setTextSize(10);
-        hint.setPadding(dp(4), 0, dp(4), dp(4));
-        panel.addView(hint);
 
         ScrollView resultScroll = new ScrollView(this);
         resultScroll.setFillViewport(true);
@@ -3406,6 +3514,7 @@ public class MainActivity extends AppCompatActivity {
         addBtn.setOnClickListener(v -> showEmmcEditor(null, code.getText().toString().trim(), renderer[0]));
         quizBtn.setOnClickListener(v -> showGradeQuiz());
         learnBtn.setOnClickListener(v -> showGradeMemorization());
+        gradeTableBtn.setOnClickListener(v -> showGradeTableImage());
         close.setOnClickListener(v -> { if (emmcDialog != null) emmcDialog.dismiss(); });
         renderer[0].run();
 
