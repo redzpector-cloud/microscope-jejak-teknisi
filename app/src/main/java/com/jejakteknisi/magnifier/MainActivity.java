@@ -1417,6 +1417,8 @@ public class MainActivity extends AppCompatActivity {
         private float strokeDp = 5f;
         private Annotation selected;
         private float lastSelectX, lastSelectY;
+        private float selectDownX, selectDownY;
+        private boolean selectMoved = false;
         private float lastRotateAngle = 0f;
         private boolean rotatingSelected = false;
         private boolean transformingSelected = false;
@@ -1454,7 +1456,7 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; transformingSelected=false; selectedHandle=0; transformStart=null; invalidate(); }
+        void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; transformingSelected=false; selectedHandle=0; transformStart=null; selectMoved=false; invalidate(); }
         void prepareOcrHistory(){ pushUndo(); }
         void addOcr(float x1, float y1, float x2, float y2, String text) {
             items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
@@ -2285,10 +2287,13 @@ public class MainActivity extends AppCompatActivity {
                     selected=hitTest(x,y);
                     selectedHandle=0;
                     moveHistoryPushed=false;
+                    selectDownX=x; selectDownY=y;
                     lastSelectX=x; lastSelectY=y;
+                    selectMoved=false;
                     rotatingSelected=false;
                     transformingSelected=false;
                     lastRotateAngle=0f;
+                    invalidate();
                     return true;
                 }
                 if(selected!=null && selectedHandle!=0 && action==MotionEvent.ACTION_MOVE) {
@@ -2313,6 +2318,10 @@ public class MainActivity extends AppCompatActivity {
                     invalidate(); return true;
                 }
                 if(action==MotionEvent.ACTION_MOVE && selected!=null && !rotatingSelected) {
+                    float totalMove=(float)Math.hypot(x-selectDownX,y-selectDownY);
+                    // Ignore tiny finger jitter so a simple tap stays a tap.
+                    if (!selectMoved && totalMove < dp(10)) return true;
+                    selectMoved=true;
                     if (!moveHistoryPushed) { pushUndo(); moveHistoryPushed=true; }
                     float[] p1=viewToSource(lastSelectX,lastSelectY), p2=viewToSource(x,y);
                     float dx=p2[0]-p1[0], dy=p2[1]-p1[1];
@@ -2328,13 +2337,14 @@ public class MainActivity extends AppCompatActivity {
                 if(action==MotionEvent.ACTION_UP || action==MotionEvent.ACTION_CANCEL) {
                     jumperSnapActive=false;
                     // A simple tap on a text object opens the editor directly.
-                    // Dragging still only moves the selected object.
-                    boolean simpleTap = Math.hypot(x-lastSelectX, y-lastSelectY) < dp(12);
+                    // A real drag must never accidentally open the text editor.
+                    boolean simpleTap = !selectMoved && Math.hypot(x-selectDownX, y-selectDownY) < dp(10);
                     rotatingSelected=false;
                     transformingSelected=false;
                     selectedHandle=0;
                     transformStart=null;
                     lastSelectX=x; lastSelectY=y;
+                    selectMoved=false;
                     invalidate();
                     if (action==MotionEvent.ACTION_UP && simpleTap && selected != null && selected.type==AnnotationMode.TEXT) {
                         editSelectedText();
