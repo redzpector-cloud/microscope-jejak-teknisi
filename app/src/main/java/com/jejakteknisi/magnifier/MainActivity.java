@@ -1745,7 +1745,7 @@ public class MainActivity extends AppCompatActivity {
             sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawRect(l,t,r,b,sp);
 
-            float hs=dp(4);
+            float hs=dp(5);
             float[][] corners={{l,t},{r,t},{l,b},{r,b}};
             sp.setStyle(Paint.Style.FILL);
             sp.setColor(Color.WHITE);
@@ -2150,7 +2150,7 @@ public class MainActivity extends AppCompatActivity {
             // The Select UI displays only four corner handles. Keep the touch
             // map consistent with what is visible; invisible side handles made
             // the object feel as if it resized from an empty area.
-            float hs=dp(24);
+            float hs=dp(26);
             float[][] pts={{l,t},{r,t},{r,b},{l,b}};
             int[] handleIds={1,3,5,7};
             for(int i=0;i<pts.length;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return handleIds[i];
