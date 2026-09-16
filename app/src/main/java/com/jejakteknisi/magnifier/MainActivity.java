@@ -3663,14 +3663,21 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        final String[] modes = {"MUDAH • Tebak kapasitas", "SEDANG • Tebak grade", "SULIT • Tebak kapasitas + grade", "KESALAHAN SAYA • Ulangi yang salah", "CEPAT • 30 detik"};
+        final String[] modes = {
+                "MUDAH • Tebak kapasitas",
+                "SEDANG • Tebak grade",
+                "SULIT • Tebak kapasitas + grade",
+                "KESALAHAN SAYA • Ulangi yang salah",
+                "CEPAT • 30 detik"
+        };
         new AlertDialog.Builder(this)
-                .setTitle("🎯 TEBAK eMMC")
+                .setTitle("🎯 KUIS eMMC")
+                .setMessage("Pilih mode latihan. Soal dan pilihan jawaban diacak setiap kali bermain.")
                 .setItems(modes, (d, which) -> {
                     if (which == 3) {
-                        java.util.ArrayList<EmmcRecord> wrong = getWrongRecords(all);
+                        ArrayList<EmmcRecord> wrong = getWrongRecords(all);
                         if (wrong.isEmpty()) {
-                            Toast.makeText(this, "Belum ada soal yang salah. Coba TEBAK eMMC dulu.", Toast.LENGTH_LONG).show();
+                            Toast.makeText(this, "Belum ada soal yang salah. Coba kuis dulu.", Toast.LENGTH_LONG).show();
                             return;
                         }
                         startEmmcQuiz(wrong, which);
@@ -3712,6 +3719,7 @@ public class MainActivity extends AppCompatActivity {
         final int totalQuestions = speedMode ? Math.min(999, pool.size()) : Math.min(10, pool.size());
         final int[] questionIndex = {0};
         final int[] score = {0};
+        final int bestBefore = getSharedPreferences("emmc_quiz", MODE_PRIVATE).getInt("best_mode_" + mode, 0);
         final java.util.HashSet<String> usedParts = new java.util.HashSet<>();
         final android.os.Handler timerHandler = new android.os.Handler(android.os.Looper.getMainLooper());
         final long endTime = System.currentTimeMillis() + 30000L;
@@ -3722,7 +3730,7 @@ public class MainActivity extends AppCompatActivity {
         root.setBackgroundColor(Color.rgb(3, 20, 38));
 
         TextView title = new TextView(this);
-        title.setText("🎯 TEBAK eMMC"); title.setTextColor(Color.WHITE); title.setTextSize(21); title.setTypeface(null, Typeface.BOLD);
+        title.setText("🎯 KUIS eMMC"); title.setTextColor(Color.WHITE); title.setTextSize(21); title.setTypeface(null, Typeface.BOLD);
         root.addView(title, new LinearLayout.LayoutParams(-1, dp(42)));
         TextView progress = new TextView(this); progress.setTextColor(Color.LTGRAY); progress.setTextSize(13);
         root.addView(progress, new LinearLayout.LayoutParams(-1, dp(30)));
@@ -3733,7 +3741,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout choices = new LinearLayout(this); choices.setOrientation(LinearLayout.VERTICAL); root.addView(choices, new LinearLayout.LayoutParams(-1, 0, 1));
         TextView result = new TextView(this); result.setTextColor(Color.WHITE); result.setTextSize(14); result.setGravity(Gravity.CENTER); result.setPadding(dp(4), dp(6), dp(4), dp(6)); root.addView(result, new LinearLayout.LayoutParams(-1, dp(52)));
         LinearLayout bottom = new LinearLayout(this); bottom.setGravity(Gravity.CENTER_VERTICAL);
-        Button guide = makeButton("📖 HAPAL"); guide.setTextSize(11); bottom.addView(guide, new LinearLayout.LayoutParams(0, dp(46), 1));
+        Button guide = makeButton("📚 BELAJAR"); guide.setTextSize(11); bottom.addView(guide, new LinearLayout.LayoutParams(0, dp(46), 1));
         Button close = makeButton("TUTUP"); close.setTextSize(11); LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(46), 1); cp.leftMargin = dp(8); bottom.addView(close, cp); root.addView(bottom);
 
         final AlertDialog dialog = new AlertDialog.Builder(this).setView(root).create();
@@ -3743,9 +3751,13 @@ public class MainActivity extends AppCompatActivity {
         class QuizController {
             void finish(String message) {
                 timerHandler.removeCallbacksAndMessages(null);
-                progress.setText("SELESAI • Skor " + score[0] + (speedMode ? "" : "/" + totalQuestions));
+                int best = Math.max(bestBefore, score[0]);
+                if (score[0] > bestBefore) {
+                    getSharedPreferences("emmc_quiz", MODE_PRIVATE).edit().putInt("best_mode_" + mode, score[0]).apply();
+                }
+                progress.setText("SELESAI • Skor " + score[0] + (speedMode ? "" : "/" + totalQuestions) + " • Rekor " + best);
                 codeText.setText("🎉 SELESAI"); question.setText(message); choices.removeAllViews();
-                result.setText(speedMode ? "Mode cepat selesai. Coba lagi untuk mengejar skor lebih tinggi." : "Soal berikutnya akan diacak saat membuka TEBAK lagi.");
+                result.setText(score[0] > bestBefore ? "🏆 Rekor baru!" : "Rekor terbaik: " + best + " • Coba lagi untuk meningkatkannya.");
             }
             void next() {
                 if (speedMode && System.currentTimeMillis() >= endTime) { finish("Waktu habis! Benar: " + score[0]); return; }
@@ -3758,13 +3770,13 @@ public class MainActivity extends AppCompatActivity {
                 if (rec == null && speedMode) { usedParts.clear(); rec = pool.get(random.nextInt(pool.size())); }
                 if (rec == null) { finish("Semua soal sudah digunakan."); return; }
                 final EmmcRecord current = rec;
-                progress.setText(speedMode ? "⏱ CEPAT • Skor " + score[0] : "Soal " + (questionIndex[0]+1) + "/" + totalQuestions + " • Skor " + score[0]);
+                progress.setText(speedMode ? "⏱ CEPAT • Skor " + score[0] + " • Rekor " + bestBefore : "Soal " + (questionIndex[0]+1) + "/" + totalQuestions + " • Skor " + score[0] + " • Rekor " + bestBefore);
                 codeText.setText(current.part); result.setText(""); choices.removeAllViews();
                 String capacity = current.capacity == null || current.capacity.trim().isEmpty() ? "Tidak diketahui" : current.capacity.trim();
                 String grade = current.grade == null || current.grade.trim().isEmpty() ? "Tidak diketahui" : current.grade.trim();
                 final String answer;
                 if (mode == 0) { question.setText("Kapasitas eMMC ini berapa?"); answer = capacity; }
-                else if (mode == 1) { question.setText("Grade eMMC ini apa?"); answer = grade; }
+                else if (mode == 1 || mode == 3) { question.setText("Grade eMMC ini apa?"); answer = grade; }
                 else if (mode == 2) { question.setText("Kapasitas + grade yang benar?"); answer = capacity + " • " + grade; }
                 else { question.setText("Kapasitas eMMC ini berapa?"); answer = capacity; }
                 java.util.ArrayList<String> options = new java.util.ArrayList<>();
@@ -3773,7 +3785,9 @@ public class MainActivity extends AppCompatActivity {
                 for (EmmcRecord r : all) {
                     if (options.size() >= 4 || r == null) continue;
                     String opt;
-                    if (mode == 1) opt = r.grade; else if (mode == 2) opt = (r.capacity == null ? "Tidak diketahui" : r.capacity.trim()) + " • " + (r.grade == null ? "Tidak diketahui" : r.grade.trim()); else opt = r.capacity;
+                    if (mode == 1 || mode == 3) opt = r.grade;
+                    else if (mode == 2) opt = (r.capacity == null ? "Tidak diketahui" : r.capacity.trim()) + " • " + (r.grade == null ? "Tidak diketahui" : r.grade.trim());
+                    else opt = r.capacity;
                     if (opt == null || opt.trim().isEmpty()) continue; opt = opt.trim();
                     if (seen.add(opt.toUpperCase(Locale.US))) options.add(opt);
                 }
@@ -3788,7 +3802,6 @@ public class MainActivity extends AppCompatActivity {
                         questionIndex[0]++; v.postDelayed(this::next, 650);
                     });
                 }
-                if (speedMode) timerHandler.postDelayed(() -> { if (dialog.isShowing()) next(); }, Math.max(100, endTime-System.currentTimeMillis()));
             }
         }
         QuizController controller = new QuizController();
@@ -3799,76 +3812,113 @@ public class MainActivity extends AppCompatActivity {
     private void showGradeMemorization() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(14), dp(18), dp(10));
+        root.setPadding(dp(16), dp(12), dp(16), dp(10));
         root.setBackgroundColor(Color.rgb(3, 20, 38));
 
         TextView title = new TextView(this);
-        title.setText("📚 CARA CEPAT HAPAL GRADE");
+        title.setText("📚 BELAJAR CEPAT — GRADE eMMC");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(21);
+        title.setTextSize(20);
         title.setTypeface(null, Typeface.BOLD);
-        root.addView(title, new LinearLayout.LayoutParams(-1, dp(42)));
+        root.addView(title, new LinearLayout.LayoutParams(-1, dp(44)));
 
         TextView sub = new TextView(this);
-        sub.setText("Hafalkan rumus berikut seperti catatan teknisi.");
+        sub.setText("Pilih merek untuk melihat pola kode kapasitas. Gunakan sebagai panduan cepat teknisi.");
         sub.setTextColor(Color.LTGRAY);
         sub.setTextSize(13);
-        root.addView(sub, new LinearLayout.LayoutParams(-1, dp(32)));
+        sub.setPadding(0, 0, 0, dp(6));
+        root.addView(sub, new LinearLayout.LayoutParams(-1, dp(46)));
+
+        LinearLayout brandRow = new LinearLayout(this);
+        brandRow.setOrientation(LinearLayout.HORIZONTAL);
+        brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        root.addView(brandRow, new LinearLayout.LayoutParams(-1, dp(48)));
 
         ScrollView scroll = new ScrollView(this);
         TextView rules = new TextView(this);
         rules.setTextColor(Color.WHITE);
         rules.setTextSize(15);
         rules.setLineSpacing(dp(2), 1.05f);
-        rules.setPadding(dp(4), dp(4), dp(4), dp(14));
-        rules.setText(
-                "SAMSUNG\n\n" +
-                "Klm A = 16gb\n\n" +
-                "Klm B / Klu B =32gb\n\n" +
-                "Klm C / Klu C = 64gb\n\n" +
-                "Klm D / Klu D = 128gb\n\n" +
-                "Klm E / Klu E = 256gb\n\n" +
-                "Klu F = 512gb\n\n\n" +
-                "Thosiba\n\n" +
-                "Thgbmbg 7 = 16gb\n\n" +
-                "Thgbmbg 8 = 32gb\n\n" +
-                "Thgbmbg 9 = 64gb\n\n\n" +
-                "Asus\n\n" +
-                "H26m 4 =  8gb\n\n" +
-                "H26m 5 = 16gb\n\n" +
-                "H26m 6= 32gb\n\n" +
-                "H26m 7 = 64gb\n\n\n" +
-                "H28u 6 = pilihan 32\n\n" +
-                "H28u 7 = pilihan 64\n\n" +
-                "H28u 8 = pilihan 128\n\n\n" +
-                "YME C6 = 32\n\n" +
-                "         C7= 64\n\n" +
-                "         C8= 128\n\n" +
-                "         C9= 256\n\n" +
-                "YMUS 6 =32\n\n" +
-                "            7= 64\n\n" +
-                "             8=128\n\n" +
-                "             9=256\n\n\n" +
-                "Skynix\n\n" +
-                "32 - 4gb\n\n" +
-                "64_65 = 8\n\n" +
-                "17_18 = 16\n\n" +
-                "26_27 = 32\n\n" +
-                "26_27Ab= 2/32\n\n" +
-                "52_53 = 64\n\n" +
-                "15_16 = 128\n\n" +
-                "21_22 = 256");
+        rules.setPadding(dp(6), dp(10), dp(6), dp(14));
         scroll.addView(rules, new ScrollView.LayoutParams(-1, -2));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        Button quiz = makeButton("🎯  TEBAK GRADE");
-        quiz.setTextSize(14);
-        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(-1, dp(48));
-        qlp.setMargins(0, dp(8), 0, 0);
-        root.addView(quiz, qlp);
-        quiz.setOnClickListener(v -> showGradeQuiz());
+        final String[] names = {"SAMSUNG", "TOSHIBA", "ASUS", "YME", "YMUS", "SKYNIX"};
+        final String[] texts = {
+                "SAMSUNG\n\n" +
+                "KLM A  → 16 GB\n\n" +
+                "KLM B / KLU B  → 32 GB\n\n" +
+                "KLM C / KLU C  → 64 GB\n\n" +
+                "KLM D / KLU D  → 128 GB\n\n" +
+                "KLM E / KLU E  → 256 GB\n\n" +
+                "KLU F  → 512 GB\n\n" +
+                "💡 Fokus pada huruf seri KLM/KLU untuk mengingat kapasitas.",
 
-        AlertDialog dialog = new AlertDialog.Builder(this).setView(root).setPositiveButton("TUTUP", null).create();
+                "TOSHIBA\n\n" +
+                "THGBMBG7  → 16 GB\n\n" +
+                "THGBMBG8  → 32 GB\n\n" +
+                "THGBMBG9  → 64 GB\n\n" +
+                "💡 Ingat angka 7 → 16, 8 → 32, 9 → 64.",
+
+                "ASUS\n\n" +
+                "H26M4  → 8 GB\n\n" +
+                "H26M5  → 16 GB\n\n" +
+                "H26M6  → 32 GB\n\n" +
+                "H26M7  → 64 GB\n\n" +
+                "H28U6  → Pilihan 32 GB\n\n" +
+                "H28U7  → Pilihan 64 GB\n\n" +
+                "H28U8  → Pilihan 128 GB",
+
+                "YME\n\n" +
+                "C6  → 32 GB\n\n" +
+                "C7  → 64 GB\n\n" +
+                "C8  → 128 GB\n\n" +
+                "C9  → 256 GB",
+
+                "YMUS\n\n" +
+                "6  → 32 GB\n\n" +
+                "7  → 64 GB\n\n" +
+                "8  → 128 GB\n\n" +
+                "9  → 256 GB",
+
+                "SKYNIX\n\n" +
+                "32  → 4 GB\n\n" +
+                "64 / 65  → 8 GB\n\n" +
+                "17 / 18  → 16 GB\n\n" +
+                "26 / 27  → 32 GB\n\n" +
+                "26 / 27 AB  → 2/32 GB\n\n" +
+                "52 / 53  → 64 GB\n\n" +
+                "15 / 16  → 128 GB\n\n" +
+                "21 / 22  → 256 GB"
+        };
+
+        for (int i = 0; i < names.length; i++) {
+            final int idx = i;
+            Button b = makeButton(names[i]);
+            b.setTextSize(10);
+            b.setAllCaps(false);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(0, dp(42), 1);
+            if (i > 0) bp.leftMargin = dp(4);
+            brandRow.addView(b, bp);
+            b.setOnClickListener(v -> rules.setText(texts[idx]));
+        }
+        rules.setText(texts[0]);
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        Button quiz = makeButton("🎯 TEBAK GRADE");
+        quiz.setTextSize(13);
+        bottom.addView(quiz, new LinearLayout.LayoutParams(0, dp(48), 1));
+        Button close = makeButton("TUTUP");
+        close.setTextSize(13);
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(48), 1);
+        cp.leftMargin = dp(8);
+        bottom.addView(close, cp);
+        root.addView(bottom);
+
+        AlertDialog dialog = new AlertDialog.Builder(this).setView(root).create();
+        close.setOnClickListener(v -> dialog.dismiss());
+        quiz.setOnClickListener(v -> { dialog.dismiss(); showGradeQuiz(); });
         dialog.show();
     }
 
