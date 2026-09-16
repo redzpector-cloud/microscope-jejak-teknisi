@@ -2147,9 +2147,13 @@ public class MainActivity extends AppCompatActivity {
         private int hitSelectionHandle(float x, float y, Annotation a) {
             float[] box=annotationViewBounds(a);
             float l=box[0], t=box[1], r=box[2], b=box[3];
+            // The Select UI displays only four corner handles. Keep the touch
+            // map consistent with what is visible; invisible side handles made
+            // the object feel as if it resized from an empty area.
             float hs=dp(30);
-            float[][] pts={{l,t},{(l+r)/2f,t},{r,t},{r,(t+b)/2f},{r,b},{(l+r)/2f,b},{l,b},{l,(t+b)/2f}};
-            for(int i=0;i<8;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return i+1;
+            float[][] pts={{l,t},{r,t},{r,b},{l,b}};
+            int[] handleIds={1,3,5,7};
+            for(int i=0;i<pts.length;i++) if(Math.hypot(x-pts[i][0],y-pts[i][1])<=hs) return handleIds[i];
             float rx=(l+r)/2f, ry=t-dp(28);
             if(Math.hypot(x-rx,y-ry)<=dp(34)) return 10;
             return 0;
