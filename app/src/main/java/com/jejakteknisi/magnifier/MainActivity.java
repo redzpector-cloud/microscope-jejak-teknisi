@@ -3240,8 +3240,9 @@ public class MainActivity extends AppCompatActivity {
 
         final ArrayList<EmmcRecord> all = loadCombinedEmmcDatabase();
 
-        // Database tetap berada di atas kamera LIVE. Kontrol kamera disembunyikan
-        // agar area preview bersih, tetapi PreviewView tetap aktif.
+        // Database memakai layar penuh tanpa kamera. Kamera tidak berguna saat
+        // hasil pencarian menutupi preview, jadi hentikan preview sementara.
+        stopCameraForDatabase();
         if (topBar != null) topBar.setVisibility(View.GONE);
         if (infoRow != null) infoRow.setVisibility(View.GONE);
         if (zoomBar != null) zoomBar.setVisibility(View.GONE);
@@ -3250,8 +3251,7 @@ public class MainActivity extends AppCompatActivity {
         if (bottomSheetHost != null) bottomSheetHost.setVisibility(View.GONE);
         if (controlsBar != null) controlsBar.setVisibility(View.GONE);
         if (status != null) status.setVisibility(View.GONE);
-        if (cameraBox != null) cameraBox.setVisibility(View.VISIBLE);
-        if (preview != null) preview.setVisibility(View.VISIBLE);
+        if (cameraBox != null) cameraBox.setVisibility(View.GONE);
 
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -3288,10 +3288,25 @@ public class MainActivity extends AppCompatActivity {
         code.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 150, 115), 24));
         panel.addView(code, new LinearLayout.LayoutParams(-1, dp(50)));
 
+        LinearLayout quickRow = new LinearLayout(this);
+        quickRow.setOrientation(LinearLayout.HORIZONTAL);
+        quickRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams qr = new LinearLayout.LayoutParams(-1, dp(46));
+        qr.setMargins(0, dp(6), 0, dp(4));
+        Button quizBtn = makeButton("🎯 KUIS");
+        quizBtn.setTextSize(12);
+        Button learnBtn = makeButton("📚 BELAJAR CEPAT");
+        learnBtn.setTextSize(12);
+        quickRow.addView(quizBtn, new LinearLayout.LayoutParams(0, dp(44), 1));
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, dp(44), 1);
+        lp2.setMargins(dp(6), 0, 0, 0);
+        quickRow.addView(learnBtn, lp2);
+        panel.addView(quickRow, qr);
+
         Button addBtn = makeButton("＋  Tambah Data");
         addBtn.setTextSize(13);
         LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(44));
-        ap.setMargins(0, dp(6), 0, dp(4));
+        ap.setMargins(0, 0, 0, dp(4));
         panel.addView(addBtn, ap);
 
         TextView hint = new TextView(this);
@@ -3389,6 +3404,8 @@ public class MainActivity extends AppCompatActivity {
             public void afterTextChanged(android.text.Editable e) {}
         });
         addBtn.setOnClickListener(v -> showEmmcEditor(null, code.getText().toString().trim(), renderer[0]));
+        quizBtn.setOnClickListener(v -> showGradeQuiz());
+        learnBtn.setOnClickListener(v -> showGradeMemorization());
         close.setOnClickListener(v -> { if (emmcDialog != null) emmcDialog.dismiss(); });
         renderer[0].run();
 
@@ -3400,23 +3417,9 @@ public class MainActivity extends AppCompatActivity {
             if (w != null) {
                 w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 w.setDimAmount(0.0f);
-                w.setGravity(Gravity.BOTTOM);
-                int h = (int)(getResources().getDisplayMetrics().heightPixels * 0.52f);
-                w.setLayout(-1, h);
+                w.setGravity(Gravity.CENTER);
+                w.setLayout(-1, -1);
             }
-            // Saat Database dibuka, fokus otomatis diarahkan ke area tulisan chip.
-            // Beberapa perangkat membutuhkan lebih dari satu metering request saat
-            // preview baru aktif, jadi lakukan settling singkat tanpa mengganggu
-            // zoom/exposure pengguna.
-            preview.postDelayed(() -> {
-                if (!isFinishing()) focusDatabaseTextArea();
-            }, 250);
-            preview.postDelayed(() -> {
-                if (!isFinishing()) focusDatabaseTextArea();
-            }, 850);
-            preview.postDelayed(() -> {
-                if (!isFinishing()) focusDatabaseTextArea();
-            }, 1500);
         });
 
         dialog.setOnDismissListener(d -> {
