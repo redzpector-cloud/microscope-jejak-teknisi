@@ -2298,12 +2298,21 @@ public class MainActivity extends AppCompatActivity {
                         float ang=(float)Math.toDegrees(Math.atan2(cur[1]-csrc[1],cur[0]-csrc[0]));
                         selected.rotation=normalizeAngle(transformStart.rotation+(ang-transformStartAngle));
                     } else {
-                        float dx0=transformStartDistance;
-                        float dx=(float)Math.hypot(cur[0]-csrc[0],cur[1]-csrc[1]);
-                        float uniform=dx/Math.max(1f,dx0);
+                        // Corner handles resize from the finger direction instead of using only
+                        // radial distance from the center. This makes horizontal/vertical
+                        // finger movement feel natural while keeping the four-corner UI.
+                        float startDx=0f, startDy=0f, curDx=0f, curDy=0f;
+                        float[] startView=annotationViewBounds(transformStart);
+                        float sx0=(startView[0]+startView[2])/2f, sy0=(startView[1]+startView[3])/2f;
+                        if(selectedHandle==1){ startDx=startView[0]-sx0; startDy=startView[1]-sy0; }
+                        else if(selectedHandle==3){ startDx=startView[2]-sx0; startDy=startView[1]-sy0; }
+                        else if(selectedHandle==5){ startDx=startView[2]-sx0; startDy=startView[3]-sy0; }
+                        else { startDx=startView[0]-sx0; startDy=startView[3]-sy0; }
+                        curDx=(x-sx0); curDy=(y-sy0);
+                        float ratioX=Math.abs(curDx)/Math.max(1f,Math.abs(startDx));
+                        float ratioY=Math.abs(curDy)/Math.max(1f,Math.abs(startDy));
+                        float uniform=Math.max(0.12f,Math.min(4f,Math.max(ratioX,ratioY)));
                         float sx=uniform, sy=uniform;
-                        if(selectedHandle==2||selectedHandle==6) { sy=1f; }
-                        else if(selectedHandle==4||selectedHandle==8) { sx=1f; }
                         scaleAnnotationFromStart(selected,transformStart,sx,sy);
                     }
                     invalidate(); return true;
