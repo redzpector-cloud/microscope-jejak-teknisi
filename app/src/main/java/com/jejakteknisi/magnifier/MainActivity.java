@@ -1736,7 +1736,7 @@ public class MainActivity extends AppCompatActivity {
             sp.setColor(Color.argb(150,0,0,0));
             sp.setPathEffect(null);
             canvas.drawRect(l,t,r,b,sp);
-            sp.setStrokeWidth(dp(1.5f));
+            sp.setStrokeWidth(dp(2));
             sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawRect(l,t,r,b,sp);
 
