@@ -1732,14 +1732,17 @@ public class MainActivity extends AppCompatActivity {
             // easier to follow over PCB/camera imagery and is consistent
             // for every selected object.
             sp.setStyle(Paint.Style.STROKE);
-            sp.setStrokeWidth(dp(2));
-            sp.setColor(Color.rgb(0, 220, 255));
+            sp.setStrokeWidth(dp(4));
+            sp.setColor(Color.argb(150,0,0,0));
             sp.setPathEffect(null);
+            canvas.drawRect(l,t,r,b,sp);
+            sp.setStrokeWidth(dp(1.5f));
+            sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawRect(l,t,r,b,sp);
 
             // Small white handles with a cyan outline are easier to grab and
             // don't visually overpower the object being edited.
-            float hs=dp(9);
+            float hs=dp(7);
             int[] hx = {(int)l,(int)r,(int)l,(int)r,(int)((l+r)/2f),(int)((l+r)/2f),(int)l,(int)r};
             int[] hy = {(int)t,(int)t,(int)b,(int)b,(int)t,(int)b,(int)((t+b)/2f),(int)((t+b)/2f)};
             sp.setStyle(Paint.Style.FILL);
@@ -1796,7 +1799,7 @@ public class MainActivity extends AppCompatActivity {
                 ep.setStyle(Paint.Style.FILL); ep.setTypeface(Typeface.DEFAULT_BOLD); ep.setTextSize(dp(11));
                 ep.setColor(Color.BLACK);
                 canvas.drawCircle(av[0],av[1],dp(18),ep); canvas.drawCircle(bv[0],bv[1],dp(18),ep);
-                ep.setStyle(Paint.Style.STROKE); ep.setStrokeWidth(dp(3)); ep.setColor(Color.YELLOW);
+                ep.setStyle(Paint.Style.STROKE); ep.setStrokeWidth(dp(3)); ep.setColor(Color.rgb(0, 220, 255));
                 canvas.drawCircle(av[0],av[1],dp(17),ep); canvas.drawCircle(bv[0],bv[1],dp(17),ep);
                 ep.setStyle(Paint.Style.FILL); ep.setColor(Color.WHITE);
                 canvas.drawText("A",av[0]-dp(4),av[1]+dp(4),ep);
