@@ -1,36 +1,19 @@
-# Jejak Teknisi Microscope
+# JEJAK CAM V9 – Action Motor
 
-Versi 3.0.1 — build stabil untuk GitHub Actions.
+Versi fokus untuk perekaman saat motor bergerak:
+- continuous autofocus
+- CameraX video stabilization + Camera2 EIS request
+- horizon assist berbasis sensor rotasi untuk membantu menjaga HP tetap level
+- wide camera jika perangkat mengekspos kamera ultra-wide
+- 1080p recording
 
-## Perbaikan utama
-- Manajemen bitmap Freeze dibatasi agar lebih aman terhadap OutOfMemory.
-- OCR menggunakan gambar yang dibatasi maksimal 2048 px.
-- Google Lens/chooser dicek dengan `resolveActivity()` sehingga tidak menyebabkan crash saat aplikasi tujuan tidak tersedia.
-- Capture Camera2 enhancement dibuat opsional/fallback untuk perangkat yang tidak kompatibel.
-- Exposure slider mengikuti range exposure kamera yang sebenarnya.
-- Bitmap hasil anotasi dibersihkan setelah penyimpanan.
-- File `MainActivity.java` duplikat di root project dihapus.
-- GitHub Actions menggunakan Gradle 8.9 + JDK 17.
-
-## Build di GitHub
-Workflow berada di `.github/workflows/main.yml`.
-
-1. Upload seluruh isi project ke repository GitHub.
-2. Push ke branch `main` atau jalankan Actions → Build Magnifier Microscope APK → Run workflow.
-3. APK Debug tersedia pada artifact `magnifier-microscope-debug-apk`.
-
-## V3 changes
-- Google Lens launch no longer uses ACTION_SEND/Share Sheet.
-- Added Android package visibility for Google/Lens on Android 11+.
-- Photo remains in app cache until the user chooses Gallery.
-- Increased the zoom/exposure info row height so labels are not clipped.
+Catatan: horizon assist adalah indikator level; koreksi horizon video penuh tetap bergantung pada kemampuan hardware/OIS/EIS perangkat.
 
 
-## V4
-- Google Lens direct intent now tries `google://lens` first, matching Chromium's current Lens contract, with `LensBitmapUriKey` and `ActivityLaunchTimestampNanos`.
-- No Android Share Sheet fallback.
-- Zoom text area enlarged to prevent clipping.
+## V11.3
+- Nama aplikasi: JEJAK CAM PRO
+- Nama APK artifact: JEJAK_CAM_PRO.apk
+- Versi: 1.1.3 (versionCode 14).
 
-
-## EMMC DATABASE V2
-Database eMMC telah digabung dengan file EMMC_database_teks_biasa. Kode duplikat dihapus berdasarkan kode ternormalisasi. Lihat `README_EMMC_DATABASE_V2.md`.
+## V54
+Stability patch untuk lifecycle CameraX dan callback kamera tertunda. Lihat `V54_CAMERA_STABILITY.md`.
