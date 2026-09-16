@@ -2587,6 +2587,14 @@ public class MainActivity extends AppCompatActivity {
                 Preview.Builder previewBuilder = new Preview.Builder();
                 Camera2Interop.Extender<Preview> previewExtender = new Camera2Interop.Extender<>(previewBuilder);
                 applyLiveDetailRequest(previewExtender);
+                // Keep the rear camera in continuous autofocus so the microscope
+                // preview can settle on small chip markings/text naturally.
+                try {
+                    previewExtender.setCaptureRequestOption(
+                            CaptureRequest.CONTROL_AF_MODE,
+                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                    );
+                } catch (Throwable ignored) {}
                 Preview previewUseCase = previewBuilder.build();
 
                         ImageCapture.Builder captureBuilder = new ImageCapture.Builder()
@@ -2888,6 +2896,18 @@ public class MainActivity extends AppCompatActivity {
         torch = !torch;
         camera.getCameraControl().enableTorch(torch);
         torchBtn.setText(torch ? "🔦\nLampu ON" : "🔦\nLampu");
+    }
+
+    private void focusDatabaseTextArea() {
+        if (preview == null || camera == null) return;
+        if (preview.getWidth() <= 0 || preview.getHeight() <= 0) return;
+        // The eMMC marking is normally near the visual center. Meter a compact
+        // point there so autofocus targets the chip marking instead of the
+        // background/board edges. Repeat briefly because the lens may still be
+        // settling immediately after the Database panel appears.
+        final float x = preview.getWidth() * 0.50f;
+        final float y = preview.getHeight() * 0.40f;
+        focusAt(x, y);
     }
 
     private void focusAt(float x, float y) {
@@ -3384,13 +3404,19 @@ public class MainActivity extends AppCompatActivity {
                 int h = (int)(getResources().getDisplayMetrics().heightPixels * 0.52f);
                 w.setLayout(-1, h);
             }
-            // Fokus awal diarahkan ke bagian tengah-atas preview, tempat tulisan chip
-            // biasanya berada. Ini tidak mengubah zoom atau exposure pengguna.
+            // Saat Database dibuka, fokus otomatis diarahkan ke area tulisan chip.
+            // Beberapa perangkat membutuhkan lebih dari satu metering request saat
+            // preview baru aktif, jadi lakukan settling singkat tanpa mengganggu
+            // zoom/exposure pengguna.
             preview.postDelayed(() -> {
-                if (!isFinishing() && camera != null && preview.getWidth() > 0 && preview.getHeight() > 0) {
-                    focusAt(preview.getWidth() / 2f, preview.getHeight() * 0.34f);
-                }
-            }, 450);
+                if (!isFinishing()) focusDatabaseTextArea();
+            }, 250);
+            preview.postDelayed(() -> {
+                if (!isFinishing()) focusDatabaseTextArea();
+            }, 850);
+            preview.postDelayed(() -> {
+                if (!isFinishing()) focusDatabaseTextArea();
+            }, 1500);
         });
 
         dialog.setOnDismissListener(d -> {
