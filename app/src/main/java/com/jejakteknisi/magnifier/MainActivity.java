@@ -1455,7 +1455,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         void setMode(AnnotationMode m) { mode=m; drawing=false; selected=null; rotatingSelected=false; transformingSelected=false; selectedHandle=0; transformStart=null; invalidate(); }
-        void prepareOcrHistory(){ if(!items.isEmpty() || items.isEmpty()) pushUndo(); }
+        void prepareOcrHistory(){ pushUndo(); }
         void addOcr(float x1, float y1, float x2, float y2, String text) {
             items.add(Annotation.ocr(x1, y1, x2, y2, text, Color.YELLOW, 3f));
         }
@@ -2219,7 +2219,7 @@ public class MainActivity extends AppCompatActivity {
                         float delta=angle-lastRotateAngle;
                         while(delta>180f) delta-=360f;
                         while(delta<-180f) delta+=360f;
-                        selected.rotation+=delta;
+                        selected.rotation=normalizeAngle(selected.rotation+delta);
                         float factor=dist/Math.max(1f,lastTransformDistance);
                         if (Math.abs(factor-1f)>0.003f) {
                             selected.size=Math.max(2f,Math.min(20f,selected.size*factor));
@@ -2244,6 +2244,11 @@ public class MainActivity extends AppCompatActivity {
                         if (h==0) h=hitSelectionHandle(x,y,selected);
                         if(h!=0) {
                             selectedHandle=h;
+                            // A handle transform is one undoable editor action.
+                            // V3.10.7 marked the history as pushed here but did not
+                            // actually save a snapshot, so resize/rotate could not be
+                            // undone reliably.
+                            pushUndo();
                             moveHistoryPushed=true;
                             transformStart=selected.copy();
                             float[] sp=viewToSource(x,y);
@@ -2279,7 +2284,7 @@ public class MainActivity extends AppCompatActivity {
                         moveJumperEndpointFromView(selected, selectedHandle, x, y);
                     } else if(selectedHandle==10) {
                         float ang=(float)Math.toDegrees(Math.atan2(cur[1]-csrc[1],cur[0]-csrc[0]));
-                        selected.rotation=transformStart.rotation+(ang-transformStartAngle);
+                        selected.rotation=normalizeAngle(transformStart.rotation+(ang-transformStartAngle));
                     } else {
                         float dx0=transformStartDistance;
                         float dx=(float)Math.hypot(cur[0]-csrc[0],cur[1]-csrc[1]);
