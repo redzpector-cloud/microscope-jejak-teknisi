@@ -3088,19 +3088,140 @@ public class MainActivity extends AppCompatActivity {
         return t;
     }
 
+    private static final String EMMC_USER_PREFS = "emmc_user_records_v1";
+
+    private ArrayList<EmmcRecord> loadUserEmmcDatabase() {
+        ArrayList<EmmcRecord> rows = new ArrayList<>();
+        try {
+            String raw = getSharedPreferences(EMMC_USER_PREFS, MODE_PRIVATE).getString("records", "[]");
+            org.json.JSONArray arr = new org.json.JSONArray(raw);
+            for (int i = 0; i < arr.length(); i++) {
+                org.json.JSONObject o = arr.getJSONObject(i);
+                String part = o.optString("part", "").trim();
+                if (normalizeEmmc(part).isEmpty()) continue;
+                rows.add(new EmmcRecord(part,
+                        o.optString("brand", "Tidak dicantumkan"),
+                        o.optString("capacity", "Tidak dicantumkan"),
+                        o.optString("grade", "Tidak dicantumkan"),
+                        o.optString("category", "Tidak dicantumkan"),
+                        o.optString("notes", "")));
+            }
+        } catch (Exception ignored) {}
+        return rows;
+    }
+
+    private void saveUserEmmcDatabase(ArrayList<EmmcRecord> rows) {
+        try {
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (EmmcRecord r : rows) {
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("part", r.part == null ? "" : r.part);
+                o.put("brand", r.brand == null ? "" : r.brand);
+                o.put("capacity", r.capacity == null ? "" : r.capacity);
+                o.put("grade", r.grade == null ? "" : r.grade);
+                o.put("category", r.category == null ? "" : r.category);
+                o.put("notes", r.notes == null ? "" : r.notes);
+                arr.put(o);
+            }
+            getSharedPreferences(EMMC_USER_PREFS, MODE_PRIVATE).edit().putString("records", arr.toString()).apply();
+        } catch (Exception e) {
+            Toast.makeText(this, "Gagal menyimpan database", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private ArrayList<EmmcRecord> loadCombinedEmmcDatabase() {
+        ArrayList<EmmcRecord> rows = loadEmmcDatabase();
+        java.util.LinkedHashMap<String, EmmcRecord> merged = new java.util.LinkedHashMap<>();
+        for (EmmcRecord r : rows) merged.put(normalizeEmmc(r.part), r);
+        for (EmmcRecord r : loadUserEmmcDatabase()) merged.put(normalizeEmmc(r.part), r);
+        return new ArrayList<>(merged.values());
+    }
+
+    private void saveOrUpdateUserEmmc(EmmcRecord record) {
+        ArrayList<EmmcRecord> rows = loadUserEmmcDatabase();
+        String key = normalizeEmmc(record.part);
+        boolean updated = false;
+        for (int i = 0; i < rows.size(); i++) {
+            if (normalizeEmmc(rows.get(i).part).equals(key)) {
+                rows.set(i, record);
+                updated = true;
+                break;
+            }
+        }
+        if (!updated) rows.add(record);
+        saveUserEmmcDatabase(rows);
+    }
+
+    private EditText emmcFormField(LinearLayout box, String hint, String value) {
+        EditText e = new EditText(this);
+        e.setSingleLine(false);
+        e.setHint(hint);
+        e.setText(value == null ? "" : value);
+        e.setTextColor(Color.WHITE);
+        e.setHintTextColor(Color.rgb(145, 175, 195));
+        e.setTextSize(14);
+        e.setPadding(dp(12), dp(8), dp(12), dp(8));
+        e.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 110, 145), 12));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, dp(48));
+        lp.setMargins(0, dp(4), 0, dp(4));
+        box.addView(e, lp);
+        return e;
+    }
+
+    private void showEmmcEditor(EmmcRecord existing, String suggestedPart, Runnable afterSave) {
+        boolean edit = existing != null;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(6), dp(2), dp(6), dp(2));
+
+        EditText part = emmcFormField(box, "Kode / Part Number eMMC *", edit ? existing.part : suggestedPart);
+        EditText brand = emmcFormField(box, "Brand", edit ? existing.brand : "");
+        EditText capacity = emmcFormField(box, "Kapasitas", edit ? existing.capacity : "");
+        EditText grade = emmcFormField(box, "Grade", edit ? existing.grade : "");
+        EditText category = emmcFormField(box, "Kategori", edit ? existing.category : "");
+        EditText notes = emmcFormField(box, "Catatan teknisi", edit ? existing.notes : "");
+        notes.setMinLines(2);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(box);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(edit ? "Edit Data eMMC" : "Tambah Data eMMC")
+                .setView(scroll)
+                .setNegativeButton("Batal", null)
+                .setPositiveButton("Simpan", null)
+                .create();
+        dialog.setOnShowListener(v -> {
+            Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            save.setOnClickListener(x -> {
+                String partText = part.getText().toString().trim();
+                if (normalizeEmmc(partText).isEmpty()) {
+                    part.setError("Kode eMMC wajib diisi");
+                    part.requestFocus();
+                    return;
+                }
+                EmmcRecord r = new EmmcRecord(
+                        partText,
+                        brand.getText().toString().trim().isEmpty() ? "Tidak dicantumkan" : brand.getText().toString().trim(),
+                        capacity.getText().toString().trim().isEmpty() ? "Tidak dicantumkan" : capacity.getText().toString().trim(),
+                        grade.getText().toString().trim().isEmpty() ? "Tidak dicantumkan" : grade.getText().toString().trim(),
+                        category.getText().toString().trim().isEmpty() ? "Tidak dicantumkan" : category.getText().toString().trim(),
+                        notes.getText().toString().trim());
+                saveOrUpdateUserEmmc(r);
+                Toast.makeText(this, edit ? "Data eMMC diperbarui" : "Data eMMC ditambahkan", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                if (afterSave != null) afterSave.run();
+            });
+        });
+        dialog.show();
+    }
+
     private void showEmmcDatabase() {
         if (emmcDialog != null && emmcDialog.isShowing()) return;
 
-        final ArrayList<EmmcRecord> all = loadEmmcDatabase();
-        if (all.isEmpty()) {
-            Toast.makeText(this, "Database eMMC kosong.", Toast.LENGTH_LONG).show();
-            return;
-        }
+        final ArrayList<EmmcRecord> all = loadCombinedEmmcDatabase();
 
-        // MODE FULL DATABASE: kamera benar-benar dihentikan agar seluruh layar
-        // dipakai untuk database eMMC, bukan ditampilkan di belakang dialog.
-        stopCameraForDatabase();
-        if (cameraBox != null) cameraBox.setVisibility(View.GONE);
+        // Database tetap berada di atas kamera LIVE. Kontrol kamera disembunyikan
+        // agar area preview bersih, tetapi PreviewView tetap aktif.
         if (topBar != null) topBar.setVisibility(View.GONE);
         if (infoRow != null) infoRow.setVisibility(View.GONE);
         if (zoomBar != null) zoomBar.setVisibility(View.GONE);
@@ -3109,63 +3230,56 @@ public class MainActivity extends AppCompatActivity {
         if (bottomSheetHost != null) bottomSheetHost.setVisibility(View.GONE);
         if (controlsBar != null) controlsBar.setVisibility(View.GONE);
         if (status != null) status.setVisibility(View.GONE);
+        if (cameraBox != null) cameraBox.setVisibility(View.VISIBLE);
+        if (preview != null) preview.setVisibility(View.VISIBLE);
 
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(12), dp(8), dp(12), dp(6));
-        panel.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 145, 255), 18));
-
-        // Drag handle untuk bottom sheet
-        TextView dragHandle = new TextView(this);
-        dragHandle.setText("━");
-        dragHandle.setTextColor(Color.rgb(150, 185, 215));
-        dragHandle.setTextSize(24);
-        dragHandle.setGravity(Gravity.CENTER);
-        dragHandle.setPadding(0, 0, 0, dp(2));
-        panel.addView(dragHandle, new LinearLayout.LayoutParams(-1, dp(24)));
+        panel.setPadding(dp(12), dp(8), dp(12), dp(8));
+        panel.setBackground(roundedBg(Color.rgb(3, 20, 38), Color.rgb(0, 150, 115), 18));
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(this);
-        title.setText("EMMC DATABASE");
+        title.setText("DATABASE eMMC");
         title.setTextColor(Color.WHITE);
-        title.setTextSize(20);
+        title.setTextSize(19);
         title.setTypeface(null, Typeface.BOLD);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(40), 1));
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1));
         TextView count = new TextView(this);
         count.setText(all.size() + " kode");
         count.setTextColor(Color.LTGRAY);
         count.setTextSize(11);
         count.setGravity(Gravity.CENTER_VERTICAL | Gravity.RIGHT);
-        header.addView(count, new LinearLayout.LayoutParams(dp(62), dp(40)));
-
-        Button tebakBtn = makeButton("🎯 TEBAK");
-        tebakBtn.setTextSize(10);
-        tebakBtn.setPadding(dp(5), 0, dp(5), 0);
-        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(82), dp(40));
-        tp.leftMargin = dp(6);
-        header.addView(tebakBtn, tp);
-        tebakBtn.setOnClickListener(v -> showGradeQuiz());
+        header.addView(count, new LinearLayout.LayoutParams(dp(62), dp(42)));
+        Button close = makeButton("✕");
+        close.setTextSize(16);
+        close.setPadding(0, 0, 0, 0);
+        header.addView(close, new LinearLayout.LayoutParams(dp(44), dp(42)));
         panel.addView(header);
 
-        LinearLayout searchRow = new LinearLayout(this);
-        searchRow.setGravity(Gravity.CENTER_VERTICAL);
         EditText code = new EditText(this);
         code.setSingleLine(true);
-        code.setHint("Cari kode eMMC...");
+        code.setHint("🔍  Cari kode eMMC...");
         code.setTextColor(Color.WHITE);
-        code.setHintTextColor(Color.rgb(150, 175, 200));
+        code.setHintTextColor(Color.rgb(145, 175, 195));
         code.setTextSize(15);
         code.setPadding(dp(14), 0, dp(10), 0);
-        code.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 145, 255), 24));
-        searchRow.addView(code, new LinearLayout.LayoutParams(0, dp(48), 1));
-        panel.addView(searchRow);
+        code.setBackground(roundedBg(Color.rgb(7, 36, 65), Color.rgb(0, 150, 115), 24));
+        panel.addView(code, new LinearLayout.LayoutParams(-1, dp(50)));
 
-        TextView summary = new TextView(this);
-        summary.setTextColor(Color.LTGRAY);
-        summary.setTextSize(11);
-        summary.setPadding(dp(4), 0, dp(4), dp(4));
-        panel.addView(summary);
+        Button addBtn = makeButton("＋  Tambah Data");
+        addBtn.setTextSize(13);
+        LinearLayout.LayoutParams ap = new LinearLayout.LayoutParams(-1, dp(44));
+        ap.setMargins(0, dp(6), 0, dp(4));
+        panel.addView(addBtn, ap);
+
+        TextView hint = new TextView(this);
+        hint.setText("Kamera otomatis fokus ke area tulisan eMMC");
+        hint.setTextColor(Color.rgb(145, 180, 195));
+        hint.setTextSize(10);
+        hint.setPadding(dp(4), 0, dp(4), dp(4));
+        panel.addView(hint);
 
         ScrollView resultScroll = new ScrollView(this);
         resultScroll.setFillViewport(true);
@@ -3174,148 +3288,111 @@ public class MainActivity extends AppCompatActivity {
         resultScroll.addView(results);
         panel.addView(resultScroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
-        TextView footer = new TextView(this);
-        footer.setText("Keterangan: EMMC/CPU gantian, tergores, sompel, auto retur");
-        footer.setTextColor(Color.rgb(160, 190, 215));
-        footer.setTextSize(9);
-        footer.setPadding(dp(4), dp(4), dp(4), 0);
-        panel.addView(footer);
-
         final Runnable[] renderer = new Runnable[1];
         renderer[0] = () -> {
+            ArrayList<EmmcRecord> current = loadCombinedEmmcDatabase();
+            count.setText(current.size() + " kode");
             String rawQuery = code.getText().toString().trim();
             String q = normalizeEmmc(rawQuery);
             results.removeAllViews();
 
-            java.util.LinkedHashMap<String, ArrayList<EmmcRecord>> grouped = new java.util.LinkedHashMap<>();
-            for (EmmcRecord r : all) {
-                if (!q.isEmpty()) {
-                    String hay = normalizeEmmc(r.part + r.category + r.brand + r.capacity);
-                    if (!hay.contains(q)) continue;
+            ArrayList<EmmcRecord> matches = new ArrayList<>();
+            for (EmmcRecord r : current) {
+                if (q.isEmpty()) {
+                    matches.add(r);
+                } else {
+                    String hay = normalizeEmmc(r.part + r.brand + r.capacity + r.grade + r.category + r.notes);
+                    if (hay.contains(q)) matches.add(r);
                 }
-                if (!grouped.containsKey(r.category)) grouped.put(r.category, new ArrayList<>());
-                grouped.get(r.category).add(r);
             }
 
-            int matches = 0;
-            for (ArrayList<EmmcRecord> list : grouped.values()) matches += list.size();
-            summary.setText(matches + " hasil" + (q.isEmpty() ? "" : " untuk \"" + rawQuery + "\""));
-
-            if (matches == 0) {
+            if (matches.isEmpty()) {
                 TextView empty = new TextView(this);
-                empty.setText("Kode tidak ditemukan. Coba ketik ulang atau pilih TEBAK eMMC.");
+                empty.setText(q.isEmpty() ? "Belum ada data." : "Kode tidak ditemukan di database.");
                 empty.setTextColor(Color.LTGRAY);
                 empty.setTextSize(13);
                 empty.setGravity(Gravity.CENTER);
-                empty.setPadding(dp(18), dp(35), dp(18), dp(35));
-                results.addView(empty);
+                empty.setPadding(dp(18), dp(18), dp(18), dp(10));
+                results.addView(empty, new LinearLayout.LayoutParams(-1, dp(70)));
+                if (!q.isEmpty()) {
+                    Button addMissing = makeButton("＋ Tambahkan " + rawQuery);
+                    addMissing.setTextSize(12);
+                    addMissing.setOnClickListener(v -> showEmmcEditor(null, rawQuery, renderer[0]));
+                    results.addView(addMissing, new LinearLayout.LayoutParams(-1, dp(46)));
+                }
                 return;
             }
 
-            // Tanpa chip/filter: tampilkan seluruh database dan kelompokkan berdasarkan kategori.
-            // Kategori tetap ditampilkan sebagai judul bagian, bukan sebagai tombol filter.
+            TextView summary = new TextView(this);
+            summary.setText(matches.size() + " hasil" + (q.isEmpty() ? "" : " untuk \"" + rawQuery + "\""));
+            summary.setTextColor(Color.LTGRAY);
+            summary.setTextSize(10);
+            summary.setPadding(dp(4), dp(4), dp(4), dp(3));
+            results.addView(summary);
 
-            for (java.util.Map.Entry<String, ArrayList<EmmcRecord>> entry : grouped.entrySet()) {
-                String cat = entry.getKey();
-                ArrayList<EmmcRecord> rows = entry.getValue();
-                TextView section = emmcSectionTitle(cat, rows.size());
-                LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(38));
-                sp.setMargins(dp(2), dp(4), dp(2), dp(3));
-                results.addView(section, sp);
-                for (EmmcRecord r : rows) {
-                    TextView item = new TextView(this);
-                    item.setText("▸  " + r.part);
-                    item.setTextColor(Color.WHITE);
-                    item.setTextSize(14);
-                    item.setGravity(Gravity.CENTER_VERTICAL);
-                    item.setPadding(dp(12), 0, dp(8), 0);
-                    item.setBackground(roundedBg(Color.rgb(6, 34, 61), Color.rgb(0, 75, 125), 8));
-                    item.setOnClickListener(v -> showEmmcDetail(r));
-                    LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, dp(40));
-                    ip.setMargins(dp(2), dp(2), dp(2), dp(2));
-                    results.addView(item, ip);
-                }
+            for (EmmcRecord r : matches) {
+                LinearLayout item = new LinearLayout(this);
+                item.setOrientation(LinearLayout.VERTICAL);
+                item.setPadding(dp(12), dp(8), dp(8), dp(8));
+                item.setBackground(roundedBg(Color.rgb(6, 34, 61), Color.rgb(0, 75, 105), 10));
+
+                TextView name = new TextView(this);
+                name.setText(r.part);
+                name.setTextColor(Color.WHITE);
+                name.setTextSize(14);
+                name.setTypeface(null, Typeface.BOLD);
+                item.addView(name);
+
+                TextView meta = new TextView(this);
+                meta.setText(r.brand + "  •  " + r.capacity + "  •  " + r.grade);
+                meta.setTextColor(Color.rgb(170, 195, 210));
+                meta.setTextSize(10);
+                item.addView(meta);
+
+                TextView editHint = new TextView(this);
+                editHint.setText("Tap untuk detail / edit");
+                editHint.setTextColor(Color.rgb(0, 210, 145));
+                editHint.setTextSize(9);
+                editHint.setPadding(0, dp(3), 0, 0);
+                item.addView(editHint);
+
+                item.setOnClickListener(v -> showEmmcDetailEditable(r, renderer[0]));
+                LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(-1, dp(72));
+                ip.setMargins(dp(2), dp(2), dp(2), dp(2));
+                results.addView(item, ip);
             }
         };
-
 
         code.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             public void onTextChanged(CharSequence s, int st, int before, int count2) { renderer[0].run(); }
             public void afterTextChanged(android.text.Editable e) {}
         });
+        addBtn.setOnClickListener(v -> showEmmcEditor(null, code.getText().toString().trim(), renderer[0]));
+        close.setOnClickListener(v -> { if (emmcDialog != null) emmcDialog.dismiss(); });
         renderer[0].run();
 
         AlertDialog dialog = new AlertDialog.Builder(this).setView(panel).create();
         emmcDialog = dialog;
-
-        // Full-screen database: kamera dimatikan dan database memakai seluruh layar.
-        final int screenHeight = getResources().getDisplayMetrics().heightPixels;
-        final int minSheet = screenHeight;
-        final int startSheet = screenHeight;
-        final int midSheet = screenHeight;
-        final int maxSheet = screenHeight;
 
         dialog.setOnShowListener(d -> {
             android.view.Window w = dialog.getWindow();
             if (w != null) {
                 w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
                 w.setDimAmount(0.0f);
-                w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
                 w.setGravity(Gravity.BOTTOM);
-                w.setLayout(-1, startSheet);
-
-                // Full database tidak lagi menjadi bottom sheet.
-                dragHandle.setOnTouchListener(new View.OnTouchListener() {
-                    float downY;
-                    int downHeight;
-                    boolean moved;
-
-                    @Override
-                    public boolean onTouch(View v, MotionEvent event) {
-                        android.view.Window window = dialog.getWindow();
-                        if (window == null) return true;
-
-                        switch (event.getActionMasked()) {
-                            case MotionEvent.ACTION_DOWN:
-                                downY = event.getRawY();
-                                downHeight = window.getAttributes().height;
-                                moved = false;
-                                return true;
-
-                            case MotionEvent.ACTION_MOVE:
-                                float dy = event.getRawY() - downY;
-                                int newHeight = (int)(downHeight - dy);
-                                newHeight = Math.max(minSheet, Math.min(maxSheet, newHeight));
-                                if (Math.abs(dy) > dp(4)) moved = true;
-                                window.setLayout(-1, newHeight);
-                                return true;
-
-                            case MotionEvent.ACTION_UP:
-                            case MotionEvent.ACTION_CANCEL:
-                                int current = window.getAttributes().height;
-                                int target;
-                                int dStart = Math.abs(current - minSheet);
-                                int dMid = Math.abs(current - midSheet);
-                                int dMax = Math.abs(current - maxSheet);
-                                target = minSheet;
-                                if (dMid < dStart) target = midSheet;
-                                if (dMax < Math.min(dStart, dMid)) target = maxSheet;
-
-                                ValueAnimator animator = ValueAnimator.ofInt(current, target);
-                                animator.setDuration(220);
-                                animator.addUpdateListener(a -> {
-                                    android.view.Window ww = dialog.getWindow();
-                                    if (ww != null) ww.setLayout(-1, (Integer)a.getAnimatedValue());
-                                });
-                                animator.start();
-                                return true;
-                        }
-                        return true;
-                    }
-                });
+                int h = (int)(getResources().getDisplayMetrics().heightPixels * 0.52f);
+                w.setLayout(-1, h);
             }
+            // Fokus awal diarahkan ke bagian tengah-atas preview, tempat tulisan chip
+            // biasanya berada. Ini tidak mengubah zoom atau exposure pengguna.
+            preview.postDelayed(() -> {
+                if (!isFinishing() && camera != null && preview.getWidth() > 0 && preview.getHeight() > 0) {
+                    focusAt(preview.getWidth() / 2f, preview.getHeight() * 0.34f);
+                }
+            }, 450);
         });
+
         dialog.setOnDismissListener(d -> {
             emmcDialog = null;
             if (topBar != null) topBar.setVisibility(View.VISIBLE);
@@ -3329,25 +3406,44 @@ public class MainActivity extends AppCompatActivity {
             if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
             scheduleLivePanelHide();
-            if (status != null) status.setText("Menyiapkan kamera LIVE...");
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                // Beri waktu Window/Dialog menutup sebelum CameraX memasang Preview kembali.
-                preview.postDelayed(() -> {
-                    if (!isFinishing() && !frozen) {
-                        preview.setVisibility(View.VISIBLE);
-                        startCamera();
-                    }
-                }, 180);
-            }
         });
+
         dialog.show();
-        android.view.Window w = dialog.getWindow();
-        if (w != null) {
-            w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            w.setDimAmount(0.0f);
-            w.setLayout(-1, startSheet);
-            w.setGravity(Gravity.BOTTOM);
+    }
+
+    private void showEmmcDetailEditable(EmmcRecord r, Runnable afterSave) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(6), dp(4), dp(6), dp(4));
+        String[] labels = {"Part Number", "Kapasitas", "Grade", "Kategori", "Brand", "Catatan"};
+        String[] values = {r.part, r.capacity, r.grade, r.category, r.brand, r.notes};
+        for (int i = 0; i < labels.length; i++) {
+            TextView t = new TextView(this);
+            t.setText(labels[i] + "\n" + (values[i] == null || values[i].isEmpty() ? "Tidak dicantumkan" : values[i]));
+            t.setTextColor(Color.WHITE); t.setTextSize(i == 0 ? 16 : 13);
+            t.setTypeface(null, i == 0 ? Typeface.BOLD : Typeface.NORMAL);
+            t.setPadding(dp(8), dp(7), dp(8), dp(7));
+            box.addView(t);
         }
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER);
+        Button edit = makeButton("✏ Edit");
+        edit.setTextSize(12);
+        Button close = makeButton("Tutup");
+        close.setTextSize(12);
+        actions.addView(edit, new LinearLayout.LayoutParams(0, dp(44), 1));
+        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(0, dp(44), 1);
+        cp.setMargins(dp(6), 0, 0, 0);
+        actions.addView(close, cp);
+        box.addView(actions);
+
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Detail eMMC").setView(box).create();
+        edit.setOnClickListener(v -> {
+            dialog.dismiss();
+            showEmmcEditor(r, null, afterSave);
+        });
+        close.setOnClickListener(v -> dialog.dismiss());
+        dialog.show();
     }
 
     private boolean matchesEmmcFilter(String category, String filter) {
