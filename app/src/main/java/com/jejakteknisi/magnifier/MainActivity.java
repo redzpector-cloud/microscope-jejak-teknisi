@@ -1734,26 +1734,26 @@ public class MainActivity extends AppCompatActivity {
             // easier to follow over PCB/camera imagery and is consistent
             // for every selected object.
             sp.setStyle(Paint.Style.STROKE);
-            sp.setStrokeWidth(dp(4));
+            // Minimal selection frame: thin cyan line and four corner handles.
+            // The touch hit areas remain larger in hitSelectionHandle(), so the
+            // UI stays clean without making small PCB objects difficult to edit.
+            sp.setStrokeWidth(dp(3));
             sp.setColor(Color.argb(150,0,0,0));
             sp.setPathEffect(null);
             canvas.drawRect(l,t,r,b,sp);
-            sp.setStrokeWidth(dp(2));
+            sp.setStrokeWidth(dp(1));
             sp.setColor(Color.rgb(0, 220, 255));
             canvas.drawRect(l,t,r,b,sp);
 
-            // Small white handles with a cyan outline are easier to grab and
-            // don't visually overpower the object being edited.
-            float hs=dp(7);
-            int[] hx = {(int)l,(int)r,(int)l,(int)r,(int)((l+r)/2f),(int)((l+r)/2f),(int)l,(int)r};
-            int[] hy = {(int)t,(int)t,(int)b,(int)b,(int)t,(int)b,(int)((t+b)/2f),(int)((t+b)/2f)};
+            float hs=dp(5);
+            float[][] corners={{l,t},{r,t},{l,b},{r,b}};
             sp.setStyle(Paint.Style.FILL);
             sp.setColor(Color.WHITE);
-            for (int i=0;i<hx.length;i++) canvas.drawCircle(hx[i],hy[i],hs,sp);
+            for(float[] pt:corners) canvas.drawCircle(pt[0],pt[1],hs,sp);
             sp.setStyle(Paint.Style.STROKE);
             sp.setStrokeWidth(dp(2));
             sp.setColor(Color.rgb(0, 220, 255));
-            for (int i=0;i<hx.length;i++) canvas.drawCircle(hx[i],hy[i],hs,sp);
+            for(float[] pt:corners) canvas.drawCircle(pt[0],pt[1],hs,sp);
 
             // Rotation handle: cyan ring + white center.
             float ry=t-dp(28);
