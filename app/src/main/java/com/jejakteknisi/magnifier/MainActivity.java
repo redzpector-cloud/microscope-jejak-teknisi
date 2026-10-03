@@ -3543,6 +3543,19 @@ public class MainActivity extends AppCompatActivity {
             if (controlsBar != null) controlsBar.setVisibility(View.VISIBLE);
             if (status != null) status.setVisibility(View.VISIBLE);
             setLivePanelVisible(true);
+
+            // Database temporarily unbinds CameraX. Rebind it when the
+            // full-screen Database dialog closes so returning to Microscope
+            // never leaves the live preview blank.
+            if (!frozen && ContextCompat.checkSelfPermission(
+                    MainActivity.this, Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED) {
+                preview.postDelayed(() -> {
+                    if (!isFinishing() && !isDestroyed() && !frozen) {
+                        startCamera();
+                    }
+                }, 180);
+            }
             scheduleLivePanelHide();
         });
 
