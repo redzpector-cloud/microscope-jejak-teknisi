@@ -76,7 +76,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final int CAMERA_PERMISSION = 7;
     private static final int GALLERY_PICK = 101;
-    private Button emmcDbBtn;
     private AlertDialog emmcDialog;
 
     private PreviewView preview;
@@ -260,10 +259,6 @@ public class MainActivity extends AppCompatActivity {
         detailBtn = makeButton("DETAIL\nON");
         detailBtn.setTextSize(11);
         top.addView(detailBtn, new LinearLayout.LayoutParams(dp(68), dp(48)));
-
-        emmcDbBtn = makeButton("💾\neMMC DB");
-        emmcDbBtn.setTextSize(10);
-        top.addView(emmcDbBtn, new LinearLayout.LayoutParams(dp(72), dp(48)));
 
         root.addView(top);
 
@@ -504,7 +499,6 @@ public class MainActivity extends AppCompatActivity {
 
         autoExposureBtn.setOnClickListener(v -> setExposure(0));
         galleryBtn.setOnClickListener(v -> openGallery());
-        emmcDbBtn.setOnClickListener(v -> showEmmcDatabase());
 
         detailBtn.setOnClickListener(v -> {
             detailOn = !detailOn;

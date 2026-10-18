@@ -88,15 +88,13 @@ public class HomeActivity extends AppCompatActivity {
 
         LinearLayout microscope = card("MICROSCOPE", "🔬", Color.rgb(20, 120, 255),
                 v -> startActivity(new Intent(this, MainActivity.class)));
-        LinearLayout emmc = card("EMMC DATABASE", "💾", Color.rgb(0, 210, 120),
-                v -> {
-                    Intent i = new Intent(this, MainActivity.class);
-                    i.putExtra("open_emmc", true); startActivity(i);
-                });
 
-        cards.addView(microscope, new LinearLayout.LayoutParams(0, dp(430), 1));
-        LinearLayout.LayoutParams e = new LinearLayout.LayoutParams(0, dp(430), 1); e.setMargins(dp(10),0,0,0);
-        cards.addView(emmc, e); root.addView(cards, new LinearLayout.LayoutParams(-1, dp(444)));
+        // Database eMMC dihapus; halaman awal hanya menampilkan Microscope.
+        LinearLayout.LayoutParams microscopeParams =
+                new LinearLayout.LayoutParams(-1, dp(360));
+        microscopeParams.setMargins(dp(12), 0, dp(12), 0);
+        cards.addView(microscope, microscopeParams);
+        root.addView(cards, new LinearLayout.LayoutParams(-1, dp(380)));
 
         TextView footer = text("J E J A K   T E K N I S I", 13, Color.LTGRAY, Typeface.BOLD);
         footer.setLetterSpacing(0.18f);
